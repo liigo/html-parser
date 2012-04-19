@@ -1,9 +1,12 @@
 #include "HtmlParser.h"
+#include <memory.h>
+#include <string.h>
+#include <ctype.h>
 
 //HtmlParser类，用于解析HTML文本
 //by liigo, @2010
 
-const char* wcsnchr(const char* pStr, int len, char c)
+const char* strnchr(const char* pStr, int len, char c)
 {
 	const char *p = pStr;
 	while(1)
@@ -51,11 +54,11 @@ unsigned int copyStr(char* pDest, unsigned int nDest, const char* pSrc, unsigned
 		return 0;
 	}
 	if(nChar == (unsigned int)-1)
-		nChar = wcslen(pSrc);
+		nChar = strlen(pSrc);
 	if(nChar > nDest)
 		nChar = nDest;
 	memcpy(pDest, pSrc, nChar * sizeof(char));
-	pDest[nChar] = L'\0';
+	pDest[nChar] = '\0';
 	return nChar;
 }
 
@@ -63,7 +66,7 @@ int copyStrUtill(char* pDest, unsigned int nDest, const char* pSrc, char endchar
 {
 	if(nDest == 0) return 0;
 	pDest[0] = L'\0';
-	const char* pSearched = (ignoreEndCharInQuoted ? getFirstUnquotedChar(pSrc,endchar) : wcschr(pSrc, endchar));
+	const char* pSearched = (ignoreEndCharInQuoted ? getFirstUnquotedChar(pSrc,endchar) : strchr(pSrc, endchar));
 	if(pSearched <= pSrc) return 0;
 	return copyStr(pDest, nDest, pSrc, pSearched - pSrc);
 }
@@ -72,7 +75,7 @@ int copyStrUtill(char* pDest, unsigned int nDest, const char* pSrc, char endchar
 char* duplicateStr(const char* pSrc, unsigned int nChar)
 {
 	if(nChar == (unsigned int)-1)
-		nChar = wcslen(pSrc);
+		nChar = strlen(pSrc);
 	char* pNew = (char*) malloc( (nChar+1) * sizeof(char) );
 	copyStr(pNew, -1, pSrc, nChar);
 	return pNew;
@@ -80,7 +83,7 @@ char* duplicateStr(const char* pSrc, unsigned int nChar)
 
 char* duplicateStrUtill(const char* pSrc, char endchar, bool ignoreEndCharInQuoted)
 {
-	const char* pSearched = (ignoreEndCharInQuoted ? getFirstUnquotedChar(pSrc,endchar) : wcschr(pSrc, endchar));;
+	const char* pSearched = (ignoreEndCharInQuoted ? getFirstUnquotedChar(pSrc,endchar) : strchr(pSrc, endchar));;
 	if(pSearched <= pSrc) return NULL;
 	int n = pSearched - pSrc;
 	return duplicateStr(pSrc, n);
@@ -94,8 +97,8 @@ void freeDuplicatedStr(char* p)
 HtmlNode* HtmlParser::newHtmlNode()
 {
 	static char staticHtmlNodeTemplate[sizeof(HtmlNode)] = {0};
-	m_HtmlNodes.Append(staticHtmlNodeTemplate, sizeof(HtmlNode));
-	HtmlNode* pNode = (HtmlNode*) (m_HtmlNodes.GetPtr() + m_HtmlNodes.GetSize() - sizeof(HtmlNode));
+	size_t offset = m_HtmlNodes.appendData(staticHtmlNodeTemplate, sizeof(HtmlNode));
+	HtmlNode* pNode = (HtmlNode*) m_HtmlNodes.getOffsetData(offset);
 	return pNode;
 }
 
@@ -146,7 +149,7 @@ void HtmlParser::parseHtml(const char* szHtml)
 				copyStrUtill(pNode->tagName, MAX_HTML_TAG_LENGTH, s, L'>', true);
 				//处理自封闭的结点, 如 <br/>, 删除tagName中可能会有的'/'字符
 				//自封闭的结点的type设置为NODE_START_TAG应该可以接受(否则要引入新的NODE_STARTCLOSE_TAG)
-				int tagNamelen = wcslen(pNode->tagName);
+				int tagNamelen = strlen(pNode->tagName);
 				if(pNode->tagName[tagNamelen-1] == L'/')
 					pNode->tagName[tagNamelen-1] = L'\0';
 				//处理结点属性
@@ -157,7 +160,7 @@ void HtmlParser::parseHtml(const char* szHtml)
 					{
 						char* props = (pNode->tagName[i] == L' ' ? s + i + 1 : s);
 						pNode->text = duplicateStrUtill(props, L'>', true);
-						int nodeTextLen = wcslen(pNode->text);
+						int nodeTextLen = strlen(pNode->text);
 						if(pNode->text[nodeTextLen-1] == L'/') //去掉最后可能会有的'/'字符, 如这种情况: <img src="..." />
 							pNode->text[nodeTextLen-1] = L'\0';
 						pNode->tagName[i] = L'\0';
@@ -182,18 +185,18 @@ void HtmlParser::parseHtml(const char* szHtml)
 	}
 
 #ifdef _DEBUG
-	//dumpHtmlNodes(); //just for test
+	dumpHtmlNodes(); //just for test
 #endif
 }
 
 unsigned int HtmlParser::getHtmlNodeCount()
 {
-	return (m_HtmlNodes.GetSize() / sizeof(HtmlNode));
+	return (m_HtmlNodes.getDataSize() / sizeof(HtmlNode));
 }
 
 HtmlNode* HtmlParser::getHtmlNodes()
 {
-	return (HtmlNode*) m_HtmlNodes.GetPtr();
+	return (HtmlNode*) m_HtmlNodes.getData();
 }
 
 void HtmlParser::freeHtmlNodes()
@@ -213,39 +216,39 @@ void HtmlParser::freeHtmlNodes()
 				if(prop->szName)  freeDuplicatedStr(prop->szName);
 				if(prop->szValue) freeDuplicatedStr(prop->szValue);
 			}
-			MFreeMemory(pNode->props); //see: CMem::Alloc and CMem::Detach
+			free(pNode->props); //see: MemBuffer::detach()
 		}
 
 	}
-	m_HtmlNodes.Empty();
+	m_HtmlNodes.clean();
 }
 
 //[virtual]
 HtmlTagType HtmlParser::getHtmlTagTypeFromName(const char* szTagName)
 {
-	//todo: uses hashmap
+	//todo: uses hashmap?
 	struct N2T { const char* name; HtmlTagType type; };
 	static N2T n2tTable[] = 
 	{
-		{ L"A", TAG_A },
-		{ L"FONT", TAG_FONT },
-		{ L"IMG", TAG_IMG },
-		{ L"P", TAG_P },
-		{ L"DIV", TAG_DIV },
-		{ L"SPAN", TAG_SPAN },
-		{ L"BR", TAG_BR },
-		{ L"B", TAG_B },
-		{ L"I", TAG_I },
-		{ L"HR", TAG_HR },
-		{ L"COLOR", TAG_COLOR },
-		{ L"BGCOLOR", TAG_BGCOLOR },
+		{ "A", TAG_A },
+		{ "FONT", TAG_FONT },
+		{ "IMG", TAG_IMG },
+		{ "P", TAG_P },
+		{ "DIV", TAG_DIV },
+		{ "SPAN", TAG_SPAN },
+		{ "BR", TAG_BR },
+		{ "B", TAG_B },
+		{ "I", TAG_I },
+		{ "HR", TAG_HR },
+		{ "COLOR", TAG_COLOR },
+		{ "BGCOLOR", TAG_BGCOLOR },
 
 	};
 
 	for(int i = 0, count = sizeof(n2tTable)/sizeof(n2tTable[0]); i < count; i++)
 	{
 		N2T* p = &n2tTable[i];
-		if(wcsicmp(p->name, szTagName) == 0)
+		if(stricmp(p->name, szTagName) == 0)
 			return p->type;
 	}
 
@@ -268,9 +271,9 @@ const char* nextUnqotedSpaceChar(const char* p)
 	return r;
 }
 
-const char* duplicateStrAndUnquote(const char* str, unsigned int nChar)
+char* duplicateStrAndUnquote(const char* str, unsigned int nChar)
 {
-	if( nChar > 1 && (str[0] == L'\"' && str[nChar-1] == L'\"') || (str[0] == L'\'' && str[nChar-1] == L'\'') )
+	if( nChar > 1 && (str[0] == '\"' && str[nChar-1] == '\"') || (str[0] == '\'' && str[nChar-1] == '\'') )
 	{
 		str++; nChar-=2;
 	}
@@ -284,30 +287,30 @@ void HtmlParser::parseNodeProps(HtmlNode* pNode)
 		return;
 	char* p = pNode->text;
 	char *ps = NULL;
-	CMem mem;
+	MemBuffer mem;
 
 	bool inQuote1 = false, inQuote2 = false;
 	char c;
 	while(c = *p)
 	{
-		if(c == L'\"')
+		if(c == '\"')
 		{
 			inQuote1 = !inQuote1;
 		}
-		else if(c == L'\'')
+		else if(c == '\'')
 		{
 			inQuote2 = !inQuote2;
 		}
 
-		if((!inQuote1 && !inQuote2) && (c == L' ' || c == L'\t' || c == L'='))
+		if((!inQuote1 && !inQuote2) && (c == ' ' || c == '\t' || c == '='))
 		{
 			if(ps)
 			{
-				mem.AddPointer(duplicateStrAndUnquote(ps, p - ps));
+				mem.appendPointer(duplicateStrAndUnquote(ps, p - ps));
 				ps = NULL;
 			}
-			if(c == L'=')
-				mem.AddPointer(NULL);
+			if(c == '=')
+				mem.appendPointer(NULL);
 		}
 		else
 		{
@@ -319,28 +322,29 @@ void HtmlParser::parseNodeProps(HtmlNode* pNode)
 	}
 
 	if(ps)
-		mem.AddPointer(duplicateStrAndUnquote(ps, p - ps));
+		mem.appendPointer(duplicateStrAndUnquote(ps, p - ps));
 
-	mem.AddPointer(NULL);
-	mem.AddPointer(NULL);
+	mem.appendPointer(NULL);
+	mem.appendPointer(NULL);
 
-	char** pp = (char**) mem.GetPtr();
+	char** pp = (char**) mem.getData();
 
-	CMem props;
-	for(int i = 0, n = mem.GetSize() / sizeof(char*) - 2; i < n; i++)
+	MemBuffer props;
+	for(int i = 0, n = mem.getDataSize() / sizeof(char*) - 2; i < n; i++)
 	{
-		props.AddPointer(pp[i]); //prop name
+		props.appendPointer(pp[i]); //prop name
 		if(pp[i+1] == NULL)
 		{
-			props.AddPointer(pp[i+2]); //prop value
+			props.appendPointer(pp[i+2]); //prop value
 			i += 2;
 		}
 		else
-			props.AddPointer(NULL); //prop vlalue
+			props.appendPointer(NULL); //prop vlalue
 	}
 
-	pNode->propCount = props.GetSize() / sizeof(char*) / 2;
-	pNode->props = (HtmlNodeProp*) props.Detach();
+	pNode->propCount = props.getDataSize() / sizeof(char*) / 2;
+	pNode->props = (HtmlNodeProp*) props.getData();
+	props.detach();
 }
 
 const HtmlNodeProp* HtmlParser::getNodeProp(const HtmlNode* pNode, const char* szPropName)
@@ -351,7 +355,7 @@ const HtmlNodeProp* HtmlParser::getNodeProp(const HtmlNode* pNode, const char* s
 	for(int i = 0; i < pNode->propCount; i++)
 	{
 		HtmlNodeProp* prop = pNode->props + i;
-		if(wcsicmp(prop->szName, szPropName) == 0)
+		if(stricmp(prop->szName, szPropName) == 0)
 			return prop;
 	}
 	return NULL;
@@ -370,17 +374,16 @@ int HtmlParser::getNodePropIntValue(const HtmlNode* pNode, const char* szPropNam
 {
 	const HtmlNodeProp* pProp = getNodeProp(pNode, szPropName);
 	if(pProp && pProp->szValue)
-		return _wtoi(pProp->szValue);
+		return atoi(pProp->szValue);
 	else
 		return defaultValue;
 }
 
-void HtmlParser::dumpHtmlNodes()
+void HtmlParser::dumpHtmlNodes(FILE* f)
 {
-#ifdef _DEBUG
 	HtmlNode* pNodes = getHtmlNodes();
-	char buffer[256];
-	printf("\n-------- dumpHtmlNodes() --------\n");
+	char buffer[256] = {0};
+	fprintf(f, "\n-------- begin HtmlParser.dumpHtmlNodes() --------\n");
 	for(int i = 0, count = getHtmlNodeCount(); i < count; i++)
 	{
 		HtmlNode* pNode = pNodes + i;
@@ -393,45 +396,44 @@ void HtmlParser::dumpHtmlNodes()
 			sprintf(buffer, "%2d) type: NODE_START_TAG, tagName: %s (%d)", i, pNode->tagName, pNode->tagType);
 			break;
 		case NODE_CLOSE_TAG:
-			sprintf(buffer, "%2d) type: NODE_CLOSE_TAG, tagName: %s", i, pNode->tagName);
+			sprintf(buffer, "%2d) type: NODE_CLOSE_TAG, tagName: %s (%d)", i, pNode->tagName, pNode->tagType);
 			break;
 		case NODE_UNKNOWN:
 		default:
 			sprintf(buffer, "%2d) type: NODE_UNKNOWN", i);
 			break;
 		}
-		printf(buffer);
+		fprintf(f, buffer);
 		if(pNode->text)
 		{
-			printf(", text: ");
-			printf(pNode->text);
+			fprintf(f, ", text: ");
+			fprintf(f, pNode->text);
 		}
-		printf("\n");
+		fprintf(f, "\n");
 
 		if(pNode->propCount > 0)
 		{
-			printf("    props: ");
+			fprintf(f, "    props: ");
 			for(int i = 0; i < pNode->propCount; i++)
 			{
 				HtmlNodeProp* prop = pNode->props + i;
 				if(prop->szValue)
 				{
-					printf(prop->szName);
-					printf(" = ");
-					printf(prop->szValue);
+					fprintf(f, prop->szName);
+					fprintf(f, " = ");
+					fprintf(f, prop->szValue);
 				}
 				else
-					printf(prop->szName);
+					fprintf(f, prop->szName);
 				if(i < pNode->propCount - 1)
 				{
-					printf(", ");
+					fprintf(f, ", ");
 				}
 			}
-			printf("\n");
+			fprintf(f, "\n");
 		}
 	}
-	printf("-------- end of dumpHtmlNodes() --------\n");
-#endif
+	fprintf(f, "-------- end of HtmlParser.dumpHtmlNodes() --------\n");
 }
 
 //-----------------------------------------------------------------------------
@@ -453,6 +455,12 @@ MemBuffer::~MemBuffer()
 void MemBuffer::clean()
 {
 	if(m_pBuffer) free(m_pBuffer);
+	m_pBuffer = NULL;
+	m_nDataSize = m_nBufferSize = 0;
+}
+
+void MemBuffer::detach()
+{
 	m_pBuffer = NULL;
 	m_nDataSize = m_nBufferSize = 0;
 }
@@ -480,12 +488,12 @@ void* MemBuffer::require(size_t size)
 	//分配缓存区内存
 	if(m_pBuffer == NULL)
 	{
-		m_pBuffer = malloc(newBufferSize);
+		m_pBuffer = (unsigned char*) malloc(newBufferSize);
 		memset(m_pBuffer, 0, newBufferSize);
 	}
 	else
 	{
-		m_pBuffer = realloc(m_pBuffer, newBufferSize);
+		m_pBuffer = (unsigned char*) realloc(m_pBuffer, newBufferSize);
 		memset(m_pBuffer + m_nBufferSize, 0, newBufferSize - m_nBufferSize);
 	}
 
@@ -494,7 +502,7 @@ void* MemBuffer::require(size_t size)
 	return (m_pBuffer + m_nDataSize); //返回
 }
 
-int MemBuffer::append(void* pData, size_t nSize)
+size_t MemBuffer::appendData(void* pData, size_t nSize)
 {
 	void* p = require(nSize);
 	memcpy(p, pData, nSize);
@@ -502,23 +510,27 @@ int MemBuffer::append(void* pData, size_t nSize)
 	return (m_nDataSize - nSize);
 }
 
+void MemBuffer::resetDataSize(size_t size)
+{
+	size_t oldDataSize = m_nDataSize;
+
+	if(size <= m_nBufferSize)
+	{
+		m_nDataSize = size;
+	}
+	else
+	{
+		m_nDataSize = 0;
+		require(size);
+		m_nDataSize = size;
+	}
+
+	if(m_nDataSize < oldDataSize)
+	{
+		//如果数据长度被压缩，把被裁掉的部分数据清零
+		memset(getOffsetData(m_nDataSize), 0, oldDataSize - m_nDataSize);
+	}
+}
+
 //-----------------------------------------------------------------------------
 
-//just for test
-#ifdef _DEBUG
-class TestHtmlParser
-{
-public:
-	TestHtmlParser()
-	{
-		HtmlParser htmlParser;
-
-		htmlParser.parseHtml(L"<link rel=\"next\" href=\"objects.html\">");
-		htmlParser.parseHtml(L"...<p>---<a href=url>link</a>...");
-		htmlParser.parseHtml(L"<p>---< a   href=url >link</a>");
-		htmlParser.parseHtml(L"<p x=a y=b z = \"c <a href=url>\" >");
-		htmlParser.parseHtml(L"<a x=0> <b y=1> <c z=ok w=false> - </c>");
-	}
-};
-//TestHtmlParser testHtmlParser;
-#endif
