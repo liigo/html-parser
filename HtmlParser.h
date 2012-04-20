@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <stddef.h>
 
+namespace liigo
+{
+
 //HtmlParser类，用于解析HTML文本
 //by liigo, @2010-2012
 
@@ -68,8 +71,10 @@ enum HtmlNodeType
 enum HtmlTagType
 {
 	TAG_UNKNOWN = 0,
-	TAG_A, TAG_DIV, TAG_FONT, TAG_IMG, TAG_P, TAG_SPAN, TAG_BR, TAG_B, TAG_I, TAG_HR, 
-	TAG_COLOR, TAG_BGCOLOR, //非标准HTML标签, 可以这样使用: <color=red>, 等效于 <color color=red>
+	TAG_SCRIPT, TAG_STYLE, //出于解析需要必须识别,内部特别处理
+	TAG_A, TAG_B, TAG_BODY, TAG_BR, TAG_DIV, TAG_FONT, TAG_HR, TAG_I, TAG_IMG, TAG_META, 
+	TAG_P, TAG_SPAN, TAG_TITLE, 
+	//TAG_COLOR, TAG_BGCOLOR, //非标准HTML标签, 可以这样使用: <color=red>, 等效于 <color color=red>
 };
 
 struct HtmlNodeProp
@@ -102,11 +107,9 @@ public:
 	//html
 	void parseHtml(const char* szHtml);
 
-	//const char* getHtml() const { return m_html.GetText(); } //继续考虑是否提供此功能
-
 	//nodes
-	unsigned int getHtmlNodeCount();
-	HtmlNode* getHtmlNodes();
+	int getHtmlNodeCount();
+	HtmlNode* getHtmlNodes(int i);
 	//props
 	const HtmlNodeProp* getNodeProp(const HtmlNode* pNode, const char* szPropName);
 	const char* getNodePropStringValue(const HtmlNode* pNode, const char* szPropName, const char* szDefaultValue = NULL);
@@ -115,8 +118,9 @@ public:
 	void dumpHtmlNodes(FILE* f = stdout);
 protected:
 	//允许子类覆盖, 以便识别更多结点(提高解析质量), 或者识别更少结点(提高解析速度)
-	virtual HtmlTagType getHtmlTagTypeFromName(const char* szTagName);
-	//允许子类覆盖, 以便更好的解析节点属性, 或者干脆不解析节点属性(提高解析速度)
+	//默认仅识别涉及HTML基本结构和信息的有限几个TAG: A,IMG,META,BODY,TITLE
+	virtual HtmlTagType getHtmlTagType(const char* szTagName);
+	//允许子类覆盖, 以便更好的解析节点属性, 或者部分解析甚至干脆不解析节点属性(提高解析速度)
 	virtual void parseNodeProps(HtmlNode* pNode);
 
 private:
@@ -127,10 +131,6 @@ private:
 	MemBuffer m_HtmlNodes;
 };
 
-//一些文本处理函数
-char* duplicateStr(const char* pSrc, unsigned int nChar);
-void freeDuplicatedStr(char* p);
-unsigned int copyStr(char* pDest, unsigned int nDest, const char* pSrc, unsigned int nChar);
-
+} //namespace liigo
 
 #endif //__HtmlParser_H__

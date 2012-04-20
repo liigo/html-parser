@@ -2,7 +2,7 @@
 
 void main()
 {
-	HtmlParser htmlParser;
+	liigo::HtmlParser htmlParser;
 
 	htmlParser.parseHtml("<link rel=\"next\" href=\"objects.html\">");
 	htmlParser.parseHtml("...<p>---<a href=url>link</a>...");
