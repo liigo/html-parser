@@ -447,9 +447,21 @@ MemBuffer::MemBuffer(size_t nBufferSize) : m_pBuffer(NULL), m_nDataSize(0), m_nB
 		require(nBufferSize);
 }
 
+MemBuffer::MemBuffer(const MemBuffer& other) : m_pBuffer(NULL), m_nDataSize(0), m_nBufferSize(0)
+{
+	*this = other; // invoke operator=()
+}
+
 MemBuffer::~MemBuffer()
 {
 	clean();
+}
+
+const MemBuffer& MemBuffer::operator= (const MemBuffer& other)
+{
+	resetDataSize(0);
+	appendData(other.getData(), other.getDataSize());
+	return *this;
 }
 
 void MemBuffer::clean()
@@ -461,6 +473,9 @@ void MemBuffer::clean()
 
 void MemBuffer::detach()
 {
+	//数据长度为0时getData()返回NULL,用户没有机会释放内存,所以必须在内部释放m_pBuffer
+	if(m_nDataSize == 0 && m_pBuffer)
+		free(m_pBuffer);
 	m_pBuffer = NULL;
 	m_nDataSize = m_nBufferSize = 0;
 }
@@ -481,7 +496,7 @@ void* MemBuffer::require(size_t size)
 		//扩充缓存区
 		newBufferSize = (m_nBufferSize == 0 ? MEM_DEFAULT_BUFFER_SIZE : m_nBufferSize);
 		do {
-			newBufferSize <<= 1; //扩充一倍
+			newBufferSize <<= 1; //每次扩充一倍
 		}while(newBufferSize - m_nDataSize < size);
 	}
 
@@ -530,6 +545,21 @@ void MemBuffer::resetDataSize(size_t size)
 		//如果数据长度被压缩，把被裁掉的部分数据清零
 		memset(getOffsetData(m_nDataSize), 0, oldDataSize - m_nDataSize);
 	}
+}
+
+void MemBuffer::exchange(MemBuffer& other)
+{
+	unsigned char* pBuffer = m_pBuffer;
+	size_t nBufferSize = m_nBufferSize;
+	size_t nDataSize = m_nDataSize;
+
+	m_pBuffer = other.m_pBuffer;
+	m_nBufferSize = other.m_nBufferSize;
+	m_nDataSize = other.m_nDataSize;
+
+	other.m_pBuffer = pBuffer;
+	other.m_nBufferSize = nBufferSize;
+	other.m_nDataSize = nDataSize;
 }
 
 //-----------------------------------------------------------------------------

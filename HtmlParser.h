@@ -8,38 +8,50 @@
 //HtmlParser类，用于解析HTML文本
 //by liigo, @2010-2012
 
-//仅内部使用的内存缓缓冲区类
+//MemBuffer: 内存缓冲区类，
 #define MEM_DEFAULT_BUFFER_SIZE  256
 class MemBuffer
 {
 public:
-	//指定缓存区初始大小(字节数), 为-1表示使用默认初始大小(MEM_DEFAULT_BUFFER_SIZE)
-	MemBuffer(size_t nBufferSize = -1); //nBufferSize
-	~MemBuffer();
+	//nBufferSize指定缓存区初始大小(字节数), 为-1表示使用默认初始大小(MEM_DEFAULT_BUFFER_SIZE)
+	//nBufferSize为0时暂不分配缓存区内存，延迟到下一次写入数据时再分配
+	MemBuffer(size_t nBufferSize = -1);
+	MemBuffer(const MemBuffer& other); //从other对象复制数据，缓存区是自行分配的
+	~MemBuffer(); //析构时清理缓存区释放内存，除非已经detach()
+	const MemBuffer& operator= (const MemBuffer& other); //清空数据后再把other内的数据复制进来
+
 public:
 	//向缓存区复制数据块，写入现有数据的末尾，必要时会自动扩充缓存区
 	//返回新写入的数据块首地址在缓存区中的偏移量
 	size_t appendData(void* pData, size_t nSize);
-	//把指针p本身的值（而非p指向的数据）添加到缓存区
-	size_t appendPointer(void* p) { return appendData(&p, sizeof(p)); }
 	//取数据首地址(在数据长度为0时返回NULL)，此地址非NULL时也就是缓存区首地址
-	//在append()或resetSize()调用之后可能会导致数据首地址发生改变
-	void* getData() { return (m_nDataSize == 0 ? NULL : m_pBuffer); }
+	//在appendXXX()或resetSize()或exchange()或operator=调用之后可能会导致数据首地址发生改变
+	void* getData() const { return (m_nDataSize == 0 ? NULL : m_pBuffer); }
 	//取指定偏移处数据地址，偏移offset应小于getDataSize()，否则不保证返回的地址有效
-	void* getOffsetData(int offset) { return (m_nDataSize == 0 ? NULL : ((unsigned char*)m_pBuffer + offset)); }
+	void* getOffsetData(int offset) const { return (m_nDataSize == 0 ? NULL : ((unsigned char*)m_pBuffer + offset)); }
 	//取数据长度
-	size_t getDataSize() { return m_nDataSize; } 
+	size_t getDataSize() const { return m_nDataSize; }
 	//重置数据长度，新长度可以为任意值，必要时会自动扩充缓存区
 	void resetDataSize(size_t size = 0);
 	//清理缓存区，释放内存
 	void clean();
-	//放弃管理缓存区和其中的数据，用户应负责用free()释放
+	//放弃管理缓存区和其中的数据，用户应自行负责用free()释放数据:
 	//数据首地址为detach()前getData()返回的地址，数据长度为detach()前getDataSize()返回的长度
 	void detach();
+	//交换两个对象(this & other)各自管理的所有内容（包括数据和缓存区）
+	void exchange(MemBuffer& other);
+
+	//添加基本类型数据
+	size_t appendInt(int i) { return appendData(&i, sizeof(i)); }
+	size_t appendChar(char c) { return appendData(&c, sizeof(c)); }
+	//把指针p本身的值（而非p指向的数据）添加到缓存区
+	size_t appendPointer(void* p) { return appendData(&p, sizeof(p)); }
+
 private:
 	//要求缓存区中至少留出长度为size的未使用空间
 	//返回未使用空间的首地址，即现有数据的末尾
 	void* require(size_t size);
+
 private:
 	unsigned char* m_pBuffer; //缓存区首地址
 	size_t m_nDataSize, m_nBufferSize; //数据长度，缓存区长度
