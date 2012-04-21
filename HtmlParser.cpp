@@ -152,12 +152,12 @@ static HtmlTagType identifyHtmlTag_Internal(const char* szTagName)
 }
 
 //[virtual]
-HtmlTagType HtmlParser::identifyHtmlTag(const char* szTagName, HtmlNode* pNode)
+HtmlTagType HtmlParser::identifyHtmlTag(const char* szTagName, HtmlNodeType nodeType)
 {
 	//默认仅识别涉及HTML基本结构和信息的有限几个TAG
 	//交给用户自行扩展以便识别更多或更少
 
-	if(pNode->type != NODE_START_TAG)
+	if(nodeType != NODE_START_TAG)
 		return TAG_UNKNOWN;
 
 	static N2T n2tTable[] = 
@@ -252,7 +252,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 				//识别节点类型(HtmlTagType)
 				pNode->tagType = identifyHtmlTag_Internal(pNode->tagName); //内部识别SCRIPT,STYLE
 				if(pNode->tagType == TAG_UNKNOWN)
-					pNode->tagType = identifyHtmlTag(pNode->tagName, pNode);
+					pNode->tagType = identifyHtmlTag(pNode->tagName, pNode->type);
 
 				//解析节点属性
 				if(pNode->type == NODE_START_TAG && parseProps && pNode->text)
