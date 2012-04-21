@@ -105,7 +105,7 @@ public:
 
 public:
 	//html
-	void parseHtml(const char* szHtml);
+	void parseHtml(const char* szHtml, bool parseProps = false);
 
 	//nodes
 	int getHtmlNodeCount();
@@ -119,8 +119,9 @@ public:
 protected:
 	//允许子类覆盖, 以便识别更多结点(提高解析质量), 或者识别更少结点(提高解析速度)
 	//默认仅识别涉及HTML基本结构和信息的有限几个TAG: A,IMG,META,BODY,TITLE
-	virtual HtmlTagType getHtmlTagType(const char* szTagName);
+	virtual HtmlTagType identifyHtmlTag(const char* szTagName, HtmlNode* pNode);
 	//允许子类覆盖, 以便更好的解析节点属性, 或者部分解析甚至干脆不解析节点属性(提高解析速度)
+	//可以根据节点名称(pNode->tagName)或节点类型(pNode->tagType)判断是否需要解析属性
 	virtual void parseNodeProps(HtmlNode* pNode);
 
 private:

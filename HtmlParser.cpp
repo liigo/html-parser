@@ -128,7 +128,7 @@ char* duplicateStrAndUnquote(const char* str, size_t nChar)
 // TagName & TagType
 struct N2T { const char* name; HtmlTagType type; };
 
-static HtmlTagType getHtmlTagTypeInTable(const char* szTagName, N2T* table, int count)
+static HtmlTagType identifyHtmlTagInTable(const char* szTagName, N2T* table, int count)
 {
 	for(int i = 0; i < count; i++)
 	{
@@ -140,7 +140,7 @@ static HtmlTagType getHtmlTagTypeInTable(const char* szTagName, N2T* table, int 
 }
 
 //出于解析需要必须识别的HtmlTagType
-static HtmlTagType getHtmlTagType_Internal(const char* szTagName)
+static HtmlTagType identifyHtmlTag_Internal(const char* szTagName)
 {
 	static N2T n2tTable[] = 
 	{
@@ -148,14 +148,18 @@ static HtmlTagType getHtmlTagType_Internal(const char* szTagName)
 		{ "STYLE", TAG_STYLE },
 	};
 
-	return getHtmlTagTypeInTable(szTagName, n2tTable, sizeof(n2tTable)/sizeof(n2tTable[0]));
+	return identifyHtmlTagInTable(szTagName, n2tTable, sizeof(n2tTable)/sizeof(n2tTable[0]));
 }
 
 //[virtual]
-HtmlTagType HtmlParser::getHtmlTagType(const char* szTagName)
+HtmlTagType HtmlParser::identifyHtmlTag(const char* szTagName, HtmlNode* pNode)
 {
 	//默认仅识别涉及HTML基本结构和信息的有限几个TAG
 	//交给用户自行扩展以便识别更多或更少
+
+	if(pNode->type != NODE_START_TAG)
+		return TAG_UNKNOWN;
+
 	static N2T n2tTable[] = 
 	{
 		{ "A", TAG_A },
@@ -165,7 +169,7 @@ HtmlTagType HtmlParser::getHtmlTagType(const char* szTagName)
 		{ "TITLE", TAG_TITLE },
 	};
 
-	return getHtmlTagTypeInTable(szTagName, n2tTable, sizeof(n2tTable)/sizeof(n2tTable[0]));
+	return identifyHtmlTagInTable(szTagName, n2tTable, sizeof(n2tTable)/sizeof(n2tTable[0]));
 }
 
 HtmlNode* HtmlParser::newHtmlNode()
@@ -176,7 +180,7 @@ HtmlNode* HtmlParser::newHtmlNode()
 	return pNode;
 }
 
-void HtmlParser::parseHtml(const char* szHtml)
+void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 {
 	freeHtmlNodes();
 	if(szHtml == NULL || *szHtml == '\0') return;
@@ -214,21 +218,25 @@ void HtmlParser::parseHtml(const char* szHtml)
 		{
 			if(p > s)
 			{
-				//Add HtmlTag Node
+				//创建新节点(HtmlNode)，得到节点类型(NodeType)和名称(TagName)
 				pNode = newHtmlNode();
 				while(isspace(*s)) s++;
 				pNode->type = (*s != '/' ? NODE_START_TAG : NODE_CLOSE_TAG);
 				if(*s == '/') s++;
+				//这里得到的tagName可能包含一部分属性文本，需在下面修正
 				copyStrUtill(pNode->tagName, MAX_HTML_TAG_LENGTH, s, '>', true);
-				//处理自封闭的结点, 如 <br/>, 删除tagName中可能会有的'/'字符
-				//自封闭的结点的type设置为NODE_START_TAG应该可以接受(否则要引入新的NODE_STARTCLOSE_TAG)
 				int tagNamelen = strlen(pNode->tagName);
 				if(pNode->tagName[tagNamelen-1] == '/')
+				{
+					//处理自封闭的结点, 如 <br/>, 删除tagName中可能会有的'/'字符
+					//自封闭的结点的type设置为NODE_START_TAG应该可以接受(否则要引入新的节点类型NODE_STARTCLOSE_TAG)
 					pNode->tagName[tagNamelen-1] = '\0';
-				//处理结点属性
+					tagNamelen--;
+				}
+				//修正节点名称，提取属性文本(存入pNode->text)
 				for(int i = 0; i < tagNamelen; i++)
 				{
-					if(pNode->tagName[i] == ' ' //第一个空格后面跟的是属性列表
+					if(pNode->tagName[i] == ' ' //第一个空格后面跟的是属性文本
 						|| pNode->tagName[i] == '=') //扩展支持这种格式: <tagName=value>, 等效于<tagName tagName=value>
 					{
 						char* props = (pNode->tagName[i] == ' ' ? s + i + 1 : s);
@@ -237,14 +245,18 @@ void HtmlParser::parseHtml(const char* szHtml)
 						if(pNode->text[nodeTextLen-1] == '/') //去掉最后可能会有的'/'字符, 如这种情况: <img src="..." />
 							pNode->text[nodeTextLen-1] = '\0';
 						pNode->tagName[i] = '\0';
-						parseNodeProps(pNode); //parse props
 						break;
 					}
 				}
+
 				//识别节点类型(HtmlTagType)
-				pNode->tagType = getHtmlTagType_Internal(pNode->tagName); //识别SCRIPT,STYLE
+				pNode->tagType = identifyHtmlTag_Internal(pNode->tagName); //内部识别SCRIPT,STYLE
 				if(pNode->tagType == TAG_UNKNOWN)
-					pNode->tagType = getHtmlTagType(pNode->tagName);
+					pNode->tagType = identifyHtmlTag(pNode->tagName, pNode);
+
+				//解析节点属性
+				if(pNode->type == NODE_START_TAG && parseProps && pNode->text)
+					parseNodeProps(pNode);
 			}
 			s = p + 1;
 		}
@@ -257,7 +269,7 @@ void HtmlParser::parseHtml(const char* szHtml)
 		//Add Text Node
 		pNode = newHtmlNode();
 		pNode->type = NODE_CONTENT;
-		pNode->text = ::duplicateStr(s, -1);
+		pNode->text = duplicateStr(s, -1);
 	}
 
 #ifdef _DEBUG
@@ -281,17 +293,17 @@ void HtmlParser::freeHtmlNodes()
 	{
 		HtmlNode* pNode = getHtmlNodes(i);
 		if(pNode->text)
-			::freeDuplicatedStr(pNode->text);
+			freeDuplicatedStr(pNode->text);
 
 		if(pNode->props)
 		{
 			for(int propIndex = 0; propIndex < pNode->propCount; propIndex++)
 			{
 				HtmlNodeProp* prop = pNode->props + propIndex;
-				if(prop->szName)  ::freeDuplicatedStr(prop->szName);
-				if(prop->szValue) ::freeDuplicatedStr(prop->szValue);
+				if(prop->szName)  freeDuplicatedStr(prop->szName);
+				if(prop->szValue) freeDuplicatedStr(prop->szValue);
 			}
-			free(pNode->props); //see: HtmlParser::parseNodeProps(), MemBuffer::detach()
+			free(pNode->props); //see: HtmlParser.parseNodeProps(), MemBuffer.detach()
 		}
 	}
 	m_HtmlNodes.clean();
