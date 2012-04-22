@@ -10,4 +10,5 @@ void main()
 	htmlParser.parseHtml("<p x=a y=b z = \"c <a href=url>\" >");
 	htmlParser.parseHtml("<a x=0> <b y=1> <c z=ok w=false> - </c>");
 	htmlParser.parseHtml("<color=red>");
+	htmlParser.parseHtml("<p><!--remarks-->...</p>");
 }

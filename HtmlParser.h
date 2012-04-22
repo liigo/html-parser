@@ -63,9 +63,10 @@ private:
 enum HtmlNodeType
 {
 	NODE_UNKNOWN = 0,
-	NODE_START_TAG,
-	NODE_CLOSE_TAG,
-	NODE_CONTENT,
+	NODE_START_TAG, //开始节点，如 <a>
+	NODE_CLOSE_TAG, //关闭节点，如 </a>
+	NODE_CONTENT,   //文本
+	NODE_REMARKS,   //注释 <!-- -->
 };
 
 enum HtmlTagType

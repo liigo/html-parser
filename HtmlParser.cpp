@@ -220,6 +220,15 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 			{
 				//创建新节点(HtmlNode)，得到节点类型(NodeType)和名称(TagName)
 				pNode = newHtmlNode();
+				if(p - s >= 5 && *s == '!' && *(s+1) == '-' && *(s+2) == '-'
+					&& *(p - 2) == '-' && *(p-1) == '-') //HTML注释: <!-- -->
+				{
+					pNode->type = NODE_REMARKS;
+					pNode->text = duplicateStr(s+3, p-s-5);
+					s = p + 1;
+					p++;
+					continue;
+				}
 				while(isspace(*s)) s++;
 				pNode->type = (*s != '/' ? NODE_START_TAG : NODE_CLOSE_TAG);
 				if(*s == '/') s++;
@@ -425,6 +434,9 @@ void HtmlParser::dumpHtmlNodes(FILE* f)
 			break;
 		case NODE_CLOSE_TAG:
 			sprintf(buffer, "%2d) type: NODE_CLOSE_TAG, tagName: %s (%d)", i, pNode->tagName, pNode->tagType);
+			break;
+		case NODE_REMARKS:
+			sprintf(buffer, "%2d) type: NODE_REMARKS", i);
 			break;
 		case NODE_UNKNOWN:
 		default:
