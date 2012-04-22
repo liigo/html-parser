@@ -64,7 +64,7 @@ enum HtmlNodeType
 {
 	NODE_UNKNOWN = 0,
 	NODE_START_TAG, //开始节点，如 <a>
-	NODE_CLOSE_TAG, //关闭节点，如 </a>
+	NODE_CLOSE_TAG, //结束节点，如 </a>
 	NODE_CONTENT,   //文本
 	NODE_REMARKS,   //注释 <!-- -->
 };
