@@ -22,7 +22,7 @@ const char* strnchr(const char* pStr, int len, char c)
 	return NULL;
 }
 
-const char* getFirstUnquotedChar(const char* pStr, char endcahr)
+const char* findFirstUnquotedChar(const char* pStr, char endchar)
 {
 	char c;
 	const char* p = pStr;
@@ -40,8 +40,65 @@ const char* getFirstUnquotedChar(const char* pStr, char endcahr)
 
 		if(!inQuote1 && !inQuote2)
 		{
-			if(c == endcahr) return p;
+			if(c == endchar) return p;
 		}
+		p++;
+	}
+	return NULL;
+}
+
+// pStr1 not NULL, pStr2 not NULL
+static bool matchStr2in1(const char* pStr1, const char* pStr2, int lenStr2, bool bCaseSensitive)
+{
+	for(int i = 0; i < lenStr2; i++)
+	{
+		if(pStr1[i] == '\0') return false;
+		bool match = bCaseSensitive ? (pStr1[i] == pStr2[i]) : (tolower(pStr1[i]) == tolower(pStr2[i]));
+		if(!match) return false;
+	}
+	return true;
+}
+
+const char* findFirstUnquotedStr(const char* pSourceStr, const char* pDestStr, bool bCaseSensitive)
+{
+	if(pDestStr == NULL || *pDestStr == '\0') return NULL;
+
+	char c;
+	const char* p = pSourceStr;
+	bool inQuote1 = false, inQuote2 = false; //'inQuote1', "inQuote2"
+	int lenDestStr = strlen(pDestStr);
+	while(c = *p)
+	{
+		if(c == '\'')
+		{
+			inQuote1 = !inQuote1;
+		}
+		else if(c == '\"')
+		{
+			inQuote2 = !inQuote2;
+		}
+
+		if(!inQuote1 && !inQuote2)
+		{
+			if(matchStr2in1(p, pDestStr, lenDestStr, bCaseSensitive))
+				return p;
+		}
+		p++;
+	}
+	return NULL;
+}
+
+const char* findFirstStr(const char* pSourceStr, const char* pDestStr, bool bCaseSensitive)
+{
+	if(pDestStr == NULL || *pDestStr == '\0') return NULL;
+
+	char c;
+	const char* p = pSourceStr;
+	int lenDestStr = strlen(pDestStr);
+	while(c = *p)
+	{
+		if(matchStr2in1(p, pDestStr, lenDestStr, bCaseSensitive))
+			return p;
 		p++;
 	}
 	return NULL;
@@ -70,7 +127,7 @@ int copyStrUtill(char* pDest, size_t nDest, const char* pSrc, char endchar, bool
 {
 	if(nDest == 0) return 0;
 	pDest[0] = '\0';
-	const char* pSearched = (ignoreEndCharInQuoted ? getFirstUnquotedChar(pSrc,endchar) : strchr(pSrc, endchar));
+	const char* pSearched = (ignoreEndCharInQuoted ? findFirstUnquotedChar(pSrc,endchar) : strchr(pSrc, endchar));
 	if(pSearched <= pSrc) return 0;
 	return copyStr(pDest, nDest, pSrc, pSearched - pSrc);
 }
@@ -87,7 +144,7 @@ char* duplicateStr(const char* pSrc, size_t nChar)
 
 char* duplicateStrUtill(const char* pSrc, char endchar, bool ignoreEndCharInQuoted)
 {
-	const char* pSearched = (ignoreEndCharInQuoted ? getFirstUnquotedChar(pSrc,endchar) : strchr(pSrc, endchar));;
+	const char* pSearched = (ignoreEndCharInQuoted ? findFirstUnquotedChar(pSrc,endchar) : strchr(pSrc, endchar));;
 	if(pSearched <= pSrc) return NULL;
 	int n = pSearched - pSrc;
 	return duplicateStr(pSrc, n);
@@ -108,9 +165,9 @@ void skipSpaceChars(char*& p)
 
 const char* nextUnqotedSpaceChar(const char* p)
 {
-	const char* r = getFirstUnquotedChar(p, ' ');
+	const char* r = findFirstUnquotedChar(p, ' ');
 	if(!r)
-		r = getFirstUnquotedChar(p, '\t');
+		r = findFirstUnquotedChar(p, '\t');
 	return r;
 }
 
@@ -190,6 +247,8 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 	HtmlNode* pNode = NULL;
 	char c;
 	bool bInQuotes = false;
+	bool bInScript = false; //between <scripte> and </script>
+	bool bInStyle  = false; //between <style> and </style>
 
 	while( c = *p )
 	{
@@ -203,6 +262,33 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 			p++; continue;
 		}
 
+		if(bInScript)
+		{
+			//略过<script>和</script>之间的任何文本
+			const char* pEndScript = findFirstStr(p, "</script>", false);
+			if(pEndScript)
+			{
+				bInScript = false;
+				p = (char*)pEndScript;
+				c = *p;
+			}
+			else
+				goto onerror; //error: no </script>
+		}
+		else if(bInStyle)
+		{
+			//略过<style>和</style>之间的任何文本
+			const char* pEndStyle = findFirstStr(p, "</style>", false);
+			if(pEndStyle)
+			{
+				bInStyle = false;
+				p = (char*)pEndStyle;
+				c = *p;
+			}
+			else
+				goto onerror; //error: no </style>
+		}
+
 		if(c == '<')
 		{
 			if(p > s)
@@ -210,7 +296,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 				//Add Text Node
 				pNode = newHtmlNode();
 				pNode->type = NODE_CONTENT;
-				pNode->text = duplicateStrUtill(s, '<', true);
+				pNode->text = duplicateStr(s, p - s);
 			}
 			s = p + 1;
 		}
@@ -258,8 +344,13 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 					}
 				}
 
-				//识别节点类型(HtmlTagType)
+				//识别节点类型(HtmlTagType) - 内部
 				pNode->tagType = identifyHtmlTag_Internal(pNode->tagName); //内部识别SCRIPT,STYLE
+				if(pNode->tagType == TAG_STYLE)
+					bInStyle = (pNode->type == NODE_START_TAG);
+				if(pNode->tagType == TAG_SCRIPT)
+					bInScript = (pNode->type == NODE_START_TAG);
+				//识别节点类型(HtmlTagType) - 用户
 				if(pNode->tagType == TAG_UNKNOWN)
 					pNode->tagType = identifyHtmlTag(pNode->tagName, pNode->type);
 
@@ -284,6 +375,13 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 #ifdef _DEBUG
 	dumpHtmlNodes(); //just for test
 #endif
+
+	return;
+
+onerror:
+	pNode = newHtmlNode();
+	pNode->type = NODE_CONTENT;
+	pNode->text = duplicateStr(s, -1);
 }
 
 int HtmlParser::getHtmlNodeCount()
