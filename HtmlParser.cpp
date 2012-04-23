@@ -209,7 +209,7 @@ static HtmlTagType identifyHtmlTag_Internal(const char* szTagName)
 }
 
 //[virtual]
-HtmlTagType HtmlParser::identifyHtmlTag(const char* szTagName, HtmlNodeType nodeType)
+HtmlTagType HtmlParser::onIdentifyHtmlTag(const char* szTagName, HtmlNodeType nodeType)
 {
 	//默认仅识别涉及HTML基本结构和信息的有限几个TAG
 	//交给用户自行扩展以便识别更多或更少
@@ -224,6 +224,7 @@ HtmlTagType HtmlParser::identifyHtmlTag(const char* szTagName, HtmlNodeType node
 		{ "META", TAG_META },
 		{ "BODY", TAG_BODY },
 		{ "TITLE", TAG_TITLE },
+		{ "FRAME", TAG_FRAME },
 	};
 
 	return identifyHtmlTagInTable(szTagName, n2tTable, sizeof(n2tTable)/sizeof(n2tTable[0]));
@@ -297,6 +298,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 				pNode = newHtmlNode();
 				pNode->type = NODE_CONTENT;
 				pNode->text = duplicateStr(s, p - s);
+				if(onNodeReady(pNode) == false) goto onuserend;
 			}
 			s = p + 1;
 		}
@@ -311,6 +313,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 				{
 					pNode->type = NODE_REMARKS;
 					pNode->text = duplicateStr(s+3, p-s-5);
+					if(onNodeReady(pNode) == false) goto onuserend;
 					s = p + 1;
 					p++;
 					continue;
@@ -352,11 +355,13 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 					bInScript = (pNode->type == NODE_START_TAG);
 				//识别节点类型(HtmlTagType) - 用户
 				if(pNode->tagType == TAG_UNKNOWN)
-					pNode->tagType = identifyHtmlTag(pNode->tagName, pNode->type);
+					pNode->tagType = onIdentifyHtmlTag(pNode->tagName, pNode->type);
 
 				//解析节点属性
 				if(pNode->type == NODE_START_TAG && parseProps && pNode->text)
-					parseNodeProps(pNode);
+					onParseNodeProps(pNode);
+
+				if(onNodeReady(pNode) == false) goto onuserend;
 			}
 			s = p + 1;
 		}
@@ -370,18 +375,27 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 		pNode = newHtmlNode();
 		pNode->type = NODE_CONTENT;
 		pNode->text = duplicateStr(s, -1);
+		if(onNodeReady(pNode) == false) goto onuserend;
 	}
 
-#ifdef _DEBUG
-	dumpHtmlNodes(); //just for test
-#endif
-
+	goto dumpnodes;
 	return;
 
 onerror:
 	pNode = newHtmlNode();
 	pNode->type = NODE_CONTENT;
 	pNode->text = duplicateStr(s, -1);
+	goto dumpnodes;
+	return;
+
+onuserend:
+	goto dumpnodes;
+	return;
+
+dumpnodes:
+#ifdef _DEBUG
+	dumpHtmlNodes(); //just for test
+#endif
 }
 
 int HtmlParser::getHtmlNodeCount()
@@ -417,6 +431,12 @@ void HtmlParser::freeHtmlNodes()
 }
 
 //[virtual]
+void HtmlParser::onParseNodeProps(HtmlNode* pNode)
+{
+	if(pNode->type == NODE_START_TAG && pNode->tagType != NODE_UNKNOWN)
+		parseNodeProps(pNode);
+}
+
 void HtmlParser::parseNodeProps(HtmlNode* pNode)
 {
 	if(pNode == NULL || pNode->propCount > 0 || pNode->text == NULL)
@@ -655,7 +675,7 @@ void* MemBuffer::require(size_t size)
 	return (m_pBuffer + m_nDataSize); //返回
 }
 
-size_t MemBuffer::appendData(void* pData, size_t nSize)
+size_t MemBuffer::appendData(const void* pData, size_t nSize)
 {
 	void* p = require(nSize);
 	memcpy(p, pData, nSize);
@@ -699,6 +719,55 @@ void MemBuffer::exchange(MemBuffer& other)
 	other.m_nBufferSize = nBufferSize;
 	other.m_nDataSize = nDataSize;
 }
+
+size_t MemBuffer::appendText(const char* szText, size_t len, bool appendZeroChar)
+{
+	if(len == (size_t)-1)
+		len = strlen(szText);
+	size_t offset = appendData(szText, len);
+	if(appendZeroChar)
+		appendChar('\0');
+	return offset;
+}
+
+bool MemBuffer::loadFromFile(const char* szFileName, bool keepExistData, bool appendZeroChar, size_t* pReadBytes)
+{
+	size_t oldDataSize = getDataSize();
+	if(!keepExistData) empty();
+	if(pReadBytes) *pReadBytes = 0;
+	if(szFileName == NULL) return false;
+	FILE* pfile = fopen(szFileName, "rb");
+	if(pfile)
+	{
+		fseek(pfile, 0, SEEK_END);
+		long filelen = ftell(pfile);
+		fseek(pfile, 0, SEEK_SET);
+
+		resetDataSize(oldDataSize + filelen);
+		size_t n = fread(getOffsetData(oldDataSize), 1, filelen, pfile);
+		resetDataSize(oldDataSize + n);
+		if(appendZeroChar) appendChar('\0');
+		if(pReadBytes) *pReadBytes = n;
+
+		fclose(pfile);
+		return (n == (size_t)filelen); // n != filelen 的情况下，返回false，同时返回了不完整的数据。不确认这种处理方法好不好。
+	}
+	
+	return false;
+}
+
+bool MemBuffer::saveToFile(const char* szFileName, const void* pBOM, size_t bomLen)
+{
+	FILE* pfile = fopen(szFileName, "wb+");
+	if(pfile)
+	{
+		if(pBOM) fwrite(pBOM, 1, bomLen, pfile);
+		fwrite(getData(), 1, getDataSize(), pfile);
+		fclose(pfile);
+	}
+	return false;
+}
+
 
 //-----------------------------------------------------------------------------
 
