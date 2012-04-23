@@ -225,6 +225,7 @@ HtmlTagType HtmlParser::onIdentifyHtmlTag(const char* szTagName, HtmlNodeType no
 		{ "BODY", TAG_BODY },
 		{ "TITLE", TAG_TITLE },
 		{ "FRAME", TAG_FRAME },
+		{ "IFRAME", TAG_IFRAME },
 	};
 
 	return identifyHtmlTagInTable(szTagName, n2tTable, sizeof(n2tTable)/sizeof(n2tTable[0]));
@@ -247,25 +248,36 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 	char* s = (char*) szHtml;
 	HtmlNode* pNode = NULL;
 	char c;
-	bool bInQuotes = false;
-	bool bInScript = false; //between <scripte> and </script>
-	bool bInStyle  = false; //between <style> and </style>
+	bool bInQuote1  = false; //between ' and '
+	bool bInQuote2  = false; //between " and "
+	bool bInScript  = false; //between <scripte> and </script>
+	bool bInStyle   = false; //between <style> and </style>
+	bool bInsideTag = false; //between < and >
 
 	while( c = *p )
 	{
-		if(c == '\"')
+		if(bInsideTag)
 		{
-			bInQuotes = !bInQuotes;
-			p++; continue;
-		}
-		if(bInQuotes)
-		{
-			p++; continue;
+			//在 < 和 > 之间，跳过单引号或双引号内的任何文本（包括<和>）
+			if(c == '\'')
+			{
+				bInQuote1 = !bInQuote1;
+				p++; continue;
+			}
+			else if(c == '\"')
+			{
+				bInQuote2 = !bInQuote2;
+				p++; continue;
+			}
+			if(bInQuote1 || bInQuote2)
+			{
+				p++; continue;
+			}
 		}
 
 		if(bInScript)
 		{
-			//略过<script>和</script>之间的任何文本
+			//跳过<script>和</script>之间的任何文本
 			const char* pEndScript = findFirstStr(p, "</script>", false);
 			if(pEndScript)
 			{
@@ -278,7 +290,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 		}
 		else if(bInStyle)
 		{
-			//略过<style>和</style>之间的任何文本
+			//跳过<style>和</style>之间的任何文本
 			const char* pEndStyle = findFirstStr(p, "</style>", false);
 			if(pEndStyle)
 			{
@@ -290,7 +302,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 				goto onerror; //error: no </style>
 		}
 
-		if(c == '<')
+		if(c == '<') // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 		{
 			if(p > s)
 			{
@@ -300,26 +312,36 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 				pNode->text = duplicateStr(s, p - s);
 				if(onNodeReady(pNode) == false) goto onuserend;
 			}
+
+			//处理HTML注释 <!-- -->
+			if(p[1] == '!' && p[2] == '-' && p[3] == '-')
+			{
+				const char* pEndRemarks = findFirstStr(p + 4, "-->", true);
+				if(pEndRemarks)
+				{
+					//Add Remarks Node
+					pNode = newHtmlNode();
+					pNode->type = NODE_REMARKS;
+					pNode->text = duplicateStr(p + 4, pEndRemarks - (p + 4));
+					if(onNodeReady(pNode) == false) goto onuserend;
+					s = p = (char*)pEndRemarks + 3;
+					bInsideTag = bInQuote1 = bInQuote2 = false;
+					continue;
+				}
+				//else: no -->, not very bad, try continue parsing
+			}
+
 			s = p + 1;
+			bInsideTag = true; bInQuote1 = bInQuote2 = false;
 		}
-		else if(c == '>')
+		else if(c == '>') // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 		{
 			if(p > s)
 			{
 				//创建新节点(HtmlNode)，得到节点类型(NodeType)和名称(TagName)
 				pNode = newHtmlNode();
-				if(p - s >= 5 && *s == '!' && *(s+1) == '-' && *(s+2) == '-'
-					&& *(p - 2) == '-' && *(p-1) == '-') //HTML注释: <!-- -->
-				{
-					pNode->type = NODE_REMARKS;
-					pNode->text = duplicateStr(s+3, p-s-5);
-					if(onNodeReady(pNode) == false) goto onuserend;
-					s = p + 1;
-					p++;
-					continue;
-				}
 				while(isspace(*s)) s++;
-				pNode->type = (*s != '/' ? NODE_START_TAG : NODE_CLOSE_TAG);
+				pNode->type = (*s == '/' ? NODE_CLOSE_TAG : NODE_START_TAG);
 				if(*s == '/') s++;
 				//这里得到的tagName可能包含一部分属性文本，需在下面修正
 				copyStrUtill(pNode->tagName, MAX_HTML_TAG_LENGTH, s, '>', true);
@@ -339,9 +361,12 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 					{
 						char* props = (pNode->tagName[i] == ' ' ? s + i + 1 : s);
 						pNode->text = duplicateStrUtill(props, '>', true);
-						int nodeTextLen = strlen(pNode->text);
-						if(pNode->text[nodeTextLen-1] == '/') //去掉最后可能会有的'/'字符, 如这种情况: <img src="..." />
-							pNode->text[nodeTextLen-1] = '\0';
+						if(pNode->text)
+						{
+							int nodeTextLen = strlen(pNode->text);
+							if(pNode->text[nodeTextLen-1] == '/') //去掉最后可能会有的'/'字符, 如这种情况: <img src="..." />
+								pNode->text[nodeTextLen-1] = '\0';
+						}
 						pNode->tagName[i] = '\0';
 						break;
 					}
@@ -363,7 +388,9 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 
 				if(onNodeReady(pNode) == false) goto onuserend;
 			}
+
 			s = p + 1;
+			bInsideTag = bInQuote1 = bInQuote2 = false;
 		}
 
 		p++;
@@ -433,7 +460,7 @@ void HtmlParser::freeHtmlNodes()
 //[virtual]
 void HtmlParser::onParseNodeProps(HtmlNode* pNode)
 {
-	if(pNode->type == NODE_START_TAG && pNode->tagType != NODE_UNKNOWN)
+	if(pNode->tagType != NODE_UNKNOWN)
 		parseNodeProps(pNode);
 }
 
@@ -561,12 +588,9 @@ void HtmlParser::dumpHtmlNodes(FILE* f)
 			sprintf(buffer, "%2d) type: NODE_UNKNOWN", i);
 			break;
 		}
-		fprintf(f, buffer);
+		fprintf(f, "%s", buffer);
 		if(pNode->text)
-		{
-			fprintf(f, ", text: ");
-			fprintf(f, pNode->text);
-		}
+			fprintf(f, ", text: %s", pNode->text);
 		fprintf(f, "\n");
 
 		if(pNode->propCount > 0)
@@ -576,13 +600,9 @@ void HtmlParser::dumpHtmlNodes(FILE* f)
 			{
 				HtmlNodeProp* prop = pNode->props + i;
 				if(prop->szValue)
-				{
-					fprintf(f, prop->szName);
-					fprintf(f, " = ");
-					fprintf(f, prop->szValue);
-				}
+					fprintf(f, "%s = %s", prop->szName, prop->szValue);
 				else
-					fprintf(f, prop->szName);
+					fprintf(f, "%s", prop->szName);
 				if(i < pNode->propCount - 1)
 				{
 					fprintf(f, ", ");
@@ -701,7 +721,7 @@ void MemBuffer::resetDataSize(size_t size)
 	if(m_nDataSize < oldDataSize)
 	{
 		//如果数据长度被压缩，把被裁掉的部分数据清零
-		memset(getOffsetData(m_nDataSize), 0, oldDataSize - m_nDataSize);
+		memset(m_pBuffer + m_nDataSize, 0, oldDataSize - m_nDataSize);
 	}
 }
 
@@ -732,7 +752,6 @@ size_t MemBuffer::appendText(const char* szText, size_t len, bool appendZeroChar
 
 bool MemBuffer::loadFromFile(const char* szFileName, bool keepExistData, bool appendZeroChar, size_t* pReadBytes)
 {
-	size_t oldDataSize = getDataSize();
 	if(!keepExistData) empty();
 	if(pReadBytes) *pReadBytes = 0;
 	if(szFileName == NULL) return false;
@@ -742,10 +761,14 @@ bool MemBuffer::loadFromFile(const char* szFileName, bool keepExistData, bool ap
 		fseek(pfile, 0, SEEK_END);
 		long filelen = ftell(pfile);
 		fseek(pfile, 0, SEEK_SET);
-
-		resetDataSize(oldDataSize + filelen);
-		size_t n = fread(getOffsetData(oldDataSize), 1, filelen, pfile);
-		resetDataSize(oldDataSize + n);
+		size_t n = 0;
+		if(filelen > 0)
+		{
+			size_t oldDataSize = getDataSize();
+			resetDataSize(oldDataSize + filelen);
+			n = fread(getOffsetData(oldDataSize), 1, filelen, pfile);
+			resetDataSize(oldDataSize + n);
+		}
 		if(appendZeroChar) appendChar('\0');
 		if(pReadBytes) *pReadBytes = n;
 
@@ -761,8 +784,10 @@ bool MemBuffer::saveToFile(const char* szFileName, const void* pBOM, size_t bomL
 	FILE* pfile = fopen(szFileName, "wb+");
 	if(pfile)
 	{
-		if(pBOM) fwrite(pBOM, 1, bomLen, pfile);
-		fwrite(getData(), 1, getDataSize(), pfile);
+		if(pBOM)
+			fwrite(pBOM, 1, bomLen, pfile);
+		if(getDataSize() > 0)
+			fwrite(getData(), 1, getDataSize(), pfile);
 		fclose(pfile);
 	}
 	return false;

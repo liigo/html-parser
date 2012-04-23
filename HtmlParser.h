@@ -75,7 +75,7 @@ private:
 enum HtmlNodeType
 {
 	NODE_UNKNOWN = 0,
-	NODE_START_TAG, //开始节点，如 <a>
+	NODE_START_TAG, //开始节点，如 <a href="liigo.com">
 	NODE_CLOSE_TAG, //结束节点，如 </a>
 	NODE_CONTENT,   //文本
 	NODE_REMARKS,   //注释 <!-- -->
@@ -85,8 +85,8 @@ enum HtmlTagType
 {
 	TAG_UNKNOWN = 0,
 	TAG_SCRIPT, TAG_STYLE, //出于解析需要必须识别,内部特别处理
-	TAG_A, TAG_B, TAG_BODY, TAG_BR, TAG_DIV, TAG_FONT, TAG_FRAME, TAG_FRAMESET, TAG_HR, 
-	TAG_I, TAG_IMG, TAG_META, TAG_P, TAG_SPAN, TAG_TITLE, 
+	TAG_A, TAG_B, TAG_BODY, TAG_BR, TAG_DIV, TAG_FONT, TAG_FORM, TAG_FRAME, TAG_FRAMESET, TAG_HR, 
+	TAG_I, TAG_IFRAME, TAG_INPUT, TAG_IMG, TAG_LABEL, TAG_LI, TAG_META, TAG_P, TAG_SPAN, TAG_TITLE, TAG_UL, 
 	//TAG_COLOR, TAG_BGCOLOR, //非标准HTML标签, 可以这样使用: <color=red>, 等效于 <color color=red>
 };
 
@@ -96,7 +96,7 @@ struct HtmlNodeProp
 	char* szValue;
 };
 
-#define MAX_HTML_TAG_LENGTH  15 //节点名称的最大字符长度
+#define MAX_HTML_TAG_LENGTH  15 //节点名称的最大字符长度,超出将被截断
 
 struct HtmlNode
 {
@@ -132,7 +132,7 @@ public:
 	void dumpHtmlNodes(FILE* f = stdout);
 protected:
 	//允许子类覆盖, 以便识别更多结点(提高解析质量), 或者识别更少结点(提高解析速度)
-	//默认仅识别涉及HTML基本结构和信息的有限几个TAG: A,IMG,META,BODY,TITLE,FRAME
+	//默认仅识别涉及HTML基本结构和信息的有限几个TAG: A,IMG,META,BODY,TITLE,FRAME,IFRAME
 	virtual HtmlTagType onIdentifyHtmlTag(const char* szTagName, HtmlNodeType nodeType);
 	//允许子类覆盖, 以便更好的解析节点属性, 或者部分解析甚至干脆不解析节点属性(提高解析速度)
 	//可以根据节点名称(pNode->tagName)或节点类型(pNode->tagType)判断是否需要解析属性
