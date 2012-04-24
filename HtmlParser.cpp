@@ -695,6 +695,15 @@ void* MemBuffer::require(size_t size)
 	return (m_pBuffer + m_nDataSize); //·µ»Ø
 }
 
+void MemBuffer::shrink()
+{
+	if(m_pBuffer == NULL || m_nBufferSize == m_nDataSize)
+		return;
+	//assert(m_nBufferSize > m_nDataSize);
+	m_nBufferSize = (m_nDataSize > 0 ? m_nDataSize : MEM_DEFAULT_BUFFER_SIZE);
+	m_pBuffer = (unsigned char*) realloc(m_pBuffer, m_nBufferSize);
+}
+
 size_t MemBuffer::appendData(const void* pData, size_t nSize)
 {
 	void* p = require(nSize);

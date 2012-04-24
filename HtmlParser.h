@@ -28,7 +28,7 @@ public:
 	//返回新写入的数据块首地址在缓存区中的偏移量
 	size_t appendData(const void* pData, size_t nSize);
 	//取数据首地址(在数据长度为0时返回NULL)，此地址非NULL时也就是缓存区首地址
-	//在appendXXX()或resetSize()或exchange()或operator=调用之后可能会导致数据首地址发生改变
+	//在appendXXX()或resetSize()或shrink()或exchange()或operator=调用之后可能会导致数据首地址发生改变
 	void* getData() const { return (m_nDataSize == 0 ? NULL : m_pBuffer); }
 	//取指定偏移处数据地址，偏移offset应小于getDataSize()，否则不保证返回的地址有效
 	void* getOffsetData(int offset) const { return (m_nDataSize == 0 ? NULL : ((unsigned char*)m_pBuffer + offset)); }
@@ -38,6 +38,8 @@ public:
 	void resetDataSize(size_t size = 0);
 	//清空数据，等效于resetDataSize(0)
 	void empty() { resetDataSize(0); }
+	//收缩缓存区，避免长时间占用不再使用的内存，但缓存区中的已有数据仍然完整保留
+	void shrink();
 	//清理缓存区，释放内存
 	void clean();
 	//放弃管理缓存区和其中的数据，用户应自行负责用free()释放数据:
@@ -123,6 +125,7 @@ public:
 	//nodes
 	int getHtmlNodeCount();
 	HtmlNode* getHtmlNodes(int i);
+	void freeHtmlNodes();
 	//props
 	const HtmlNodeProp* getNodeProp(const HtmlNode* pNode, const char* szPropName);
 	const char* getNodePropStringValue(const HtmlNode* pNode, const char* szPropName, const char* szDefaultValue = NULL);
@@ -143,7 +146,6 @@ protected:
 
 private:
 	HtmlNode* newHtmlNode();
-	void freeHtmlNodes();
 
 private:
 	MemBuffer m_HtmlNodes;
