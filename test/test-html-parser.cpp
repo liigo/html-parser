@@ -18,6 +18,10 @@ void main()
 	HtmlParser htmlParser;
 	MemBuffer  mem;
 
+	//to be fixed
+	htmlParser.parseHtml("<a\tx=1> <a\nx=1\ny=2> <a\r\nx=1\r\ny=2>", true); //非空格分隔符
+	htmlParser.parseHtml("<a x=\"abc\"y=0>", true); //属性之间没有分隔符，并不鲜见
+
 	testoutput("<!doctype html>"); //不要解析<!DOCTYPE ...>的属性，原样输出
 	testoutput("<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">");
 	testoutput("<hr/><p /><img src='...'/>"); //自封闭节点
