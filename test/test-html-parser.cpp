@@ -44,6 +44,15 @@ static testfile(const char* fileName)
 void main()
 {
 	HtmlParser htmlParser;
+	MemBuffer  mem;
+
+	htmlParser.parseHtml("<hr/><p /><img src='...'/>", true); //自封闭节点
+	htmlParser.outputHtml(mem); mem.appendChar('\0');
+	printf("%s\n", (char*)mem.getData());
+
+	htmlParser.parseHtml("<a defer url=liigo.com selected>", true); //有些属性没有值(HtmlNodeProp.szValue==NULL)
+	htmlParser.outputHtml(mem); mem.appendChar('\0');
+	printf("%s\n", (char*)mem.getData());
 
 	htmlParser.parseHtml("<script rel=\"next\" href=\"objects.html\">", true);
 	htmlParser.parseHtml("...<p>---<a href=url>link</a>...");

@@ -348,8 +348,9 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 				int tagNamelen = strlen(pNode->tagName);
 				if(pNode->tagName[tagNamelen-1] == '/')
 				{
-					//处理自封闭的结点, 如 <br/>, 删除tagName中可能会有的'/'字符
+					//处理自封闭的结点, 如<br/>, 删除tagName中可能会有的'/'字符
 					//自封闭的结点的type设置为NODE_START_TAG应该可以接受(否则要引入新的节点类型NODE_STARTCLOSE_TAG)
+					pNode->flags |= FLAG_SELF_CLOSED_TAG; //used by outputHtml()
 					pNode->tagName[tagNamelen-1] = '\0';
 					tagNamelen--;
 				}
@@ -596,6 +597,8 @@ void HtmlParser::outputHtmlNodes(FILE* f)
 		fprintf(f, "%s", buffer);
 		if(pNode->text)
 			fprintf(f, ", text: %s", pNode->text);
+		if(pNode->flags & FLAG_SELF_CLOSED_TAG)
+			fprintf(f, ", flags: />"); //自封闭
 		fprintf(f, "\r\n");
 
 		if(pNode->propCount > 0)
@@ -619,8 +622,9 @@ void HtmlParser::outputHtmlNodes(FILE* f)
 	fprintf(f, "-------- end of HtmlParser.outputHtmlNodes() --------\r\n");
 }
 
-void HtmlParser::outputHtml(MemBuffer& mem)
+void HtmlParser::outputHtml(MemBuffer& buffer, bool keepBufferData)
 {
+	if(!keepBufferData) buffer.empty();
 	int propIndex = 0;
 	for(int nodeIndex = 0, count = getHtmlNodeCount(); nodeIndex < count; nodeIndex++)
 	{
@@ -628,37 +632,39 @@ void HtmlParser::outputHtml(MemBuffer& mem)
 		switch(pNode->type)
 		{
 		case NODE_CONTENT:
-			mem.appendText(pNode->text);
+			buffer.appendText(pNode->text);
 			break;
 		case NODE_START_TAG:
-			mem.appendChar('<');
-			mem.appendText(pNode->tagName);
+			buffer.appendChar('<');
+			buffer.appendText(pNode->tagName);
 			if(pNode->propCount > 0)
-				mem.appendChar(' ');
+				buffer.appendChar(' ');
 			for(propIndex = 0; propIndex < pNode->propCount; propIndex++)
 			{
 				const HtmlNodeProp* pProp = getNodeProp(pNode, propIndex);
-				mem.appendText(pProp->szName);
+				buffer.appendText(pProp->szName);
 				if(pProp->szValue)
 				{
-					mem.appendText("=\"");
-					mem.appendText(pProp->szValue);
-					mem.appendChar('\"');
+					buffer.appendText("=\"");
+					buffer.appendText(pProp->szValue);
+					buffer.appendChar('\"');
 				}
 				if(propIndex < pNode->propCount - 1)
-					mem.appendChar(' ');
+					buffer.appendChar(' ');
 			}
-			mem.appendChar('>');
+			if(pNode->flags & FLAG_SELF_CLOSED_TAG)
+				buffer.appendChar('/'); //自封闭
+			buffer.appendChar('>');
 			break;
 		case NODE_CLOSE_TAG:
-			mem.appendText("</");
-			mem.appendText(pNode->tagName);
-			mem.appendChar('>');
+			buffer.appendText("</");
+			buffer.appendText(pNode->tagName);
+			buffer.appendChar('>');
 			break;
 		case NODE_REMARKS:
-			mem.appendText("<!--");
-			mem.appendText(pNode->text);
-			mem.appendText("-->");
+			buffer.appendText("<!--");
+			buffer.appendText(pNode->text);
+			buffer.appendText("-->");
 			break;
 		case NODE_UNKNOWN:
 		default:

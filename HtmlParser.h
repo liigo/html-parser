@@ -92,6 +92,11 @@ enum HtmlTagType
 	//TAG_COLOR, TAG_BGCOLOR, //非标准HTML标签, 可以这样使用: <color=red>, 等效于 <color color=red>
 };
 
+enum HtmlNodeFlag
+{
+	FLAG_SELF_CLOSED_TAG = 1 << 0, //自封闭标签: <br/>
+};
+
 struct HtmlNodeProp
 {
 	char* szName;
@@ -108,6 +113,7 @@ struct HtmlNode
 	char* text;
 	int propCount;
 	HtmlNodeProp* props;
+	size_t flags; //bit OR of HtmlNodeFlag
 	void* pUser; //user customized, default to NULL
 };
 
@@ -134,7 +140,7 @@ public:
 	void parseNodeProps(HtmlNode* pNode); //解析节点属性
 	//debug
 	void outputHtmlNodes(FILE* f = stdout);
-	void outputHtml(MemBuffer& mem);
+	void outputHtml(MemBuffer& buffer, bool keepBufferData = false);
 
 protected:
 	//允许子类覆盖, 以便识别更多结点(提高解析质量), 或者识别更少结点(提高解析速度)
