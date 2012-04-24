@@ -421,18 +421,18 @@ onuserend:
 
 dumpnodes:
 #ifdef _DEBUG
-	dumpHtmlNodes(); //just for test
+	outputHtmlNodes(); //just for test
 #endif
 }
 
-int HtmlParser::getHtmlNodeCount()
+size_t HtmlParser::getHtmlNodeCount()
 {
-	return (int)(m_HtmlNodes.getDataSize() / sizeof(HtmlNode));
+	return (size_t)(m_HtmlNodes.getDataSize() / sizeof(HtmlNode));
 }
 
-HtmlNode* HtmlParser::getHtmlNodes(int i)
+HtmlNode* HtmlParser::getHtmlNodes(size_t index)
 {
-	return (HtmlNode*)m_HtmlNodes.getData() + i;
+	return (HtmlNode*)m_HtmlNodes.getData() + index;
 }
 
 void HtmlParser::freeHtmlNodes()
@@ -530,6 +530,11 @@ void HtmlParser::parseNodeProps(HtmlNode* pNode)
 	props.detach();
 }
 
+const HtmlNodeProp* HtmlParser::getNodeProp(const HtmlNode* pNode, size_t index)
+{
+	return pNode->props + index;
+}
+
 const HtmlNodeProp* HtmlParser::getNodeProp(const HtmlNode* pNode, const char* szPropName)
 {
 	if(pNode == NULL || pNode->propCount <= 0)
@@ -562,10 +567,10 @@ int HtmlParser::getNodePropIntValue(const HtmlNode* pNode, const char* szPropNam
 		return defaultValue;
 }
 
-void HtmlParser::dumpHtmlNodes(FILE* f)
+void HtmlParser::outputHtmlNodes(FILE* f)
 {
 	char buffer[256] = {0};
-	fprintf(f, "\n-------- begin HtmlParser.dumpHtmlNodes() --------\n");
+	fprintf(f, "\r\n-------- begin HtmlParser.outputHtmlNodes() --------\r\n");
 	for(int i = 0, count = getHtmlNodeCount(); i < count; i++)
 	{
 		HtmlNode* pNode = getHtmlNodes(i);
@@ -591,7 +596,7 @@ void HtmlParser::dumpHtmlNodes(FILE* f)
 		fprintf(f, "%s", buffer);
 		if(pNode->text)
 			fprintf(f, ", text: %s", pNode->text);
-		fprintf(f, "\n");
+		fprintf(f, "\r\n");
 
 		if(pNode->propCount > 0)
 		{
@@ -600,7 +605,7 @@ void HtmlParser::dumpHtmlNodes(FILE* f)
 			{
 				HtmlNodeProp* prop = pNode->props + i;
 				if(prop->szValue)
-					fprintf(f, "%s = %s", prop->szName, prop->szValue);
+					fprintf(f, "%s = \"%s\"", prop->szName, prop->szValue);
 				else
 					fprintf(f, "%s", prop->szName);
 				if(i < pNode->propCount - 1)
@@ -608,10 +613,59 @@ void HtmlParser::dumpHtmlNodes(FILE* f)
 					fprintf(f, ", ");
 				}
 			}
-			fprintf(f, "\n");
+			fprintf(f, "\r\n");
 		}
 	}
-	fprintf(f, "-------- end of HtmlParser.dumpHtmlNodes() --------\n");
+	fprintf(f, "-------- end of HtmlParser.outputHtmlNodes() --------\r\n");
+}
+
+void HtmlParser::outputHtml(MemBuffer& mem)
+{
+	int propIndex = 0;
+	for(int nodeIndex = 0, count = getHtmlNodeCount(); nodeIndex < count; nodeIndex++)
+	{
+		HtmlNode* pNode = getHtmlNodes(nodeIndex);
+		switch(pNode->type)
+		{
+		case NODE_CONTENT:
+			mem.appendText(pNode->text);
+			break;
+		case NODE_START_TAG:
+			mem.appendChar('<');
+			mem.appendText(pNode->tagName);
+			if(pNode->propCount > 0)
+				mem.appendChar(' ');
+			for(propIndex = 0; propIndex < pNode->propCount; propIndex++)
+			{
+				const HtmlNodeProp* pProp = getNodeProp(pNode, propIndex);
+				mem.appendText(pProp->szName);
+				if(pProp->szValue)
+				{
+					mem.appendText("=\"");
+					mem.appendText(pProp->szValue);
+					mem.appendChar('\"');
+				}
+				if(propIndex < pNode->propCount - 1)
+					mem.appendChar(' ');
+			}
+			mem.appendChar('>');
+			break;
+		case NODE_CLOSE_TAG:
+			mem.appendText("</");
+			mem.appendText(pNode->tagName);
+			mem.appendChar('>');
+			break;
+		case NODE_REMARKS:
+			mem.appendText("<!--");
+			mem.appendText(pNode->text);
+			mem.appendText("-->");
+			break;
+		case NODE_UNKNOWN:
+		default:
+			fprintf(stderr, "HtmlParser.outputHtml(): NODE_UNKNOWN\n");
+			break;
+		} //end switch
+	}//end for
 }
 
 //-----------------------------------------------------------------------------
@@ -706,6 +760,7 @@ void MemBuffer::shrink()
 
 size_t MemBuffer::appendData(const void* pData, size_t nSize)
 {
+	if(pData == NULL) return m_nDataSize;
 	void* p = require(nSize);
 	memcpy(p, pData, nSize);
 	m_nDataSize += nSize;
@@ -751,6 +806,8 @@ void MemBuffer::exchange(MemBuffer& other)
 
 size_t MemBuffer::appendText(const char* szText, size_t len, bool appendZeroChar)
 {
+	if(szText == NULL)
+		return m_nDataSize;
 	if(len == (size_t)-1)
 		len = strlen(szText);
 	size_t offset = appendData(szText, len);

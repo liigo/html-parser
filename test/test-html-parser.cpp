@@ -1,22 +1,39 @@
 #include "../HtmlParser.h"
 
+using namespace liigo;
+
+class ParseAll : public HtmlParser
+{
+	virtual void onParseNodeProps(HtmlNode* pNode)
+	{
+		parseNodeProps(pNode);
+	}
+};
+
 static testfile(const char* fileName)
 {
-	static liigo::HtmlParser htmlParser;
-	static liigo::MemBuffer mem;
-	if(mem.loadFromFile(fileName))
+	static ParseAll htmlParser;
+	static MemBuffer memOutHtml;
+	static MemBuffer memHtml;
+	if(memHtml.loadFromFile(fileName))
 	{
-		liigo::MemBuffer outFileName;
+		MemBuffer outFileName;
 		outFileName.appendText(fileName);
-		outFileName.appendText(".txt", -1, true);
+		outFileName.appendText(".nodes.txt", -1, true);
 		FILE* out = fopen((const char*)outFileName.getData(), "wb+");
 		if(out == NULL)
 			printf("can\'t open output file %s\n", (const char*)outFileName.getData());
 
-		htmlParser.parseHtml((const char*)mem.getData(), true);
-		htmlParser.dumpHtmlNodes(out);
-
+		htmlParser.parseHtml((const char*)memHtml.getData(), true); //htmlParser.parseHtml()
+		htmlParser.outputHtmlNodes(out);
 		fclose(out);
+		
+		memOutHtml.empty();
+		htmlParser.outputHtml(memOutHtml); //htmlParser.outputHtml()
+		outFileName.empty();
+		outFileName.appendText(fileName);
+		outFileName.appendText(".html.txt", -1, true);
+		memOutHtml.saveToFile((const char*)outFileName.getData());
 	}
 	else
 	{
@@ -26,7 +43,7 @@ static testfile(const char* fileName)
 
 void main()
 {
-	liigo::HtmlParser htmlParser;
+	HtmlParser htmlParser;
 
 	htmlParser.parseHtml("<script rel=\"next\" href=\"objects.html\">", true);
 	htmlParser.parseHtml("...<p>---<a href=url>link</a>...");
@@ -48,5 +65,6 @@ void main()
 	testfile("testfiles\\google.com.html");
 	testfile("testfiles\\plus.google.com.explore.html");
 	testfile("testfiles\\cnbeta.com.html");
+	testfile("testfiles\\taobao.com.html");
 
 }

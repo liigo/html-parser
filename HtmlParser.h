@@ -123,16 +123,19 @@ public:
 	void parseHtml(const char* szHtml, bool parseProps = false);
 
 	//nodes
-	int getHtmlNodeCount();
-	HtmlNode* getHtmlNodes(int i);
+	size_t getHtmlNodeCount();
+	HtmlNode* getHtmlNodes(size_t index); //must: 0 <= index < getHtmlNodeCount()
 	void freeHtmlNodes();
 	//props
-	const HtmlNodeProp* getNodeProp(const HtmlNode* pNode, const char* szPropName);
+	const HtmlNodeProp* getNodeProp(const HtmlNode* pNode, size_t index); //must: 0 <= index < pNode->propCount
+	const HtmlNodeProp* getNodeProp(const HtmlNode* pNode, const char* szPropName); //return NULL if prop not exist
 	const char* getNodePropStringValue(const HtmlNode* pNode, const char* szPropName, const char* szDefaultValue = NULL);
 	int getNodePropIntValue(const HtmlNode* pNode, const char* szPropName, int defaultValue = 0);
 	void parseNodeProps(HtmlNode* pNode); //解析节点属性
 	//debug
-	void dumpHtmlNodes(FILE* f = stdout);
+	void outputHtmlNodes(FILE* f = stdout);
+	void outputHtml(MemBuffer& mem);
+
 protected:
 	//允许子类覆盖, 以便识别更多结点(提高解析质量), 或者识别更少结点(提高解析速度)
 	//默认仅识别涉及HTML基本结构和信息的有限几个TAG: A,IMG,META,BODY,TITLE,FRAME,IFRAME
