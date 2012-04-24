@@ -10,7 +10,45 @@ class ParseAll : public HtmlParser
 	}
 };
 
-static testfile(const char* fileName)
+static void testfile(const char* fileName);
+static void testoutput(const char* szHtml);
+
+void main()
+{
+	HtmlParser htmlParser;
+	MemBuffer  mem;
+
+	testoutput("<!doctype html>"); //不要解析<!DOCTYPE ...>的属性，原样输出
+	testoutput("<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">");
+	testoutput("<hr/><p /><img src='...'/>"); //自封闭节点
+	testoutput("<a defer url=liigo.com selected>"); //属性没有值
+
+	htmlParser.parseHtml("<script rel=\"next\" href=\"objects.html\">", true);
+	htmlParser.parseHtml("...<p>---<a href=url>link</a>...");
+	htmlParser.parseHtml("<p>---< a   href=url >link</a>");
+	htmlParser.parseHtml("<a x=a y=b z = \"c <a href=url>\" >", true); //属性值引号内有<或>不要影响解析
+	htmlParser.parseHtml("<p>\"引号”不匹配</p>");
+	htmlParser.parseHtml("<a x=0> <b y=1> <img z=ok w=false> - </img>", true);
+	htmlParser.parseHtml("<color=red>");
+	htmlParser.parseHtml("<p><!--remarks-->...</p>");
+	htmlParser.parseHtml("<p><!--**<p></p>**--><x/>...</p>");
+	htmlParser.parseHtml("<style>..<p.><<.every things here, all in style</style>");
+	htmlParser.parseHtml("<script>..<p.><<.every things here, all in script</script>");
+
+	testfile("testfiles\\sina.com.cn.html");
+	testfile("testfiles\\163.com.html");
+	testfile("testfiles\\qq.com.html");
+	testfile("testfiles\\sohu.com.html");
+	testfile("testfiles\\baidu.com.html");
+	testfile("testfiles\\google.com.html");
+	testfile("testfiles\\plus.google.com.explore.html");
+	testfile("testfiles\\cnbeta.com.html");
+	testfile("testfiles\\taobao.com.html");
+
+}
+
+
+static void testfile(const char* fileName)
 {
 	static ParseAll htmlParser;
 	static MemBuffer memOutHtml;
@@ -41,39 +79,12 @@ static testfile(const char* fileName)
 	}
 }
 
-void main()
+static void testoutput(const char* szHtml)
 {
 	HtmlParser htmlParser;
 	MemBuffer  mem;
 
-	htmlParser.parseHtml("<hr/><p /><img src='...'/>", true); //自封闭节点
+	htmlParser.parseHtml(szHtml, true);
 	htmlParser.outputHtml(mem); mem.appendChar('\0');
 	printf("%s\n", (char*)mem.getData());
-
-	htmlParser.parseHtml("<a defer url=liigo.com selected>", true); //有些属性没有值(HtmlNodeProp.szValue==NULL)
-	htmlParser.outputHtml(mem); mem.appendChar('\0');
-	printf("%s\n", (char*)mem.getData());
-
-	htmlParser.parseHtml("<script rel=\"next\" href=\"objects.html\">", true);
-	htmlParser.parseHtml("...<p>---<a href=url>link</a>...");
-	htmlParser.parseHtml("<p>---< a   href=url >link</a>");
-	htmlParser.parseHtml("<a x=a y=b z = \"c <a href=url>\" >", true); //属性值引号内有<或>不要影响解析
-	htmlParser.parseHtml("<p>\"引号”不匹配</p>");
-	htmlParser.parseHtml("<a x=0> <b y=1> <img z=ok w=false> - </img>", true);
-	htmlParser.parseHtml("<color=red>");
-	htmlParser.parseHtml("<p><!--remarks-->...</p>");
-	htmlParser.parseHtml("<p><!--**<p></p>**--><x/>...</p>");
-	htmlParser.parseHtml("<style>..<p.><<.every things here, all in style</style>");
-	htmlParser.parseHtml("<script>..<p.><<.every things here, all in script</script>");
-
-	testfile("testfiles\\sina.com.cn.html");
-	testfile("testfiles\\163.com.html");
-	testfile("testfiles\\qq.com.html");
-	testfile("testfiles\\sohu.com.html");
-	testfile("testfiles\\baidu.com.html");
-	testfile("testfiles\\google.com.html");
-	testfile("testfiles\\plus.google.com.explore.html");
-	testfile("testfiles\\cnbeta.com.html");
-	testfile("testfiles\\taobao.com.html");
-
 }

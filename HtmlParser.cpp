@@ -469,6 +469,9 @@ void HtmlParser::parseNodeProps(HtmlNode* pNode)
 {
 	if(pNode == NULL || pNode->propCount > 0 || pNode->text == NULL)
 		return;
+	if(pNode->tagName[0] == '!' && stricmp(pNode->tagName+1, "DOCTYPE") == 0)
+		return; //don't parse <!DOCTYPE ...>'s text: not name=value syntax
+
 	char* p = pNode->text;
 	char *ps = NULL;
 	MemBuffer mem;
@@ -651,6 +654,11 @@ void HtmlParser::outputHtml(MemBuffer& buffer, bool keepBufferData)
 				}
 				if(propIndex < pNode->propCount - 1)
 					buffer.appendChar(' ');
+			}
+			if(pNode->propCount == 0 && pNode->text) //±ÈÈç <!DOCTYPE ...>
+			{
+				buffer.appendChar(' ');
+				buffer.appendText(pNode->text);
 			}
 			if(pNode->flags & FLAG_SELF_CLOSED_TAG)
 				buffer.appendChar('/'); //×Ô·â±Õ
