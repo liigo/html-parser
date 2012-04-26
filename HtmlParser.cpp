@@ -22,6 +22,11 @@ const char* strnchr(const char* pStr, int len, char c)
 	return NULL;
 }
 
+inline bool matchchar(char c1, char c2, bool bCaseSensitive)
+{
+	return bCaseSensitive ? (c1 == c2) : (tolower(c1) == tolower(c2));
+}
+
 const char* findFirstUnquotedChar(const char* pStr, char endchar)
 {
 	char c;
@@ -47,14 +52,43 @@ const char* findFirstUnquotedChar(const char* pStr, char endchar)
 	return NULL;
 }
 
-// pStr1 not NULL, pStr2 not NULL
-static bool matchStr2in1(const char* pStr1, const char* pStr2, int lenStr2, bool bCaseSensitive)
+const char* findFirstUnquotedChars(const char* pStr, char* endchars, int nchars, bool bCaseSensitive)
+{
+	char c;
+	const char* p = pStr;
+	bool inQuote1 = false, inQuote2 = false; //'inQuote1', "inQuote2"
+	while(c = *p)
+	{
+		if(c == '\'')
+		{
+			inQuote1 = !inQuote1;
+		}
+		else if(c == '\"')
+		{
+			inQuote2 = !inQuote2;
+		}
+
+		if(!inQuote1 && !inQuote2)
+		{
+			for(int i = 0; i < nchars; i++)
+			{
+				if(matchchar(c, endchars[i], bCaseSensitive))
+					return p;
+			}
+		}
+		p++;
+	}
+	return NULL;
+}
+
+// return true if pStr1 starts with pStr2. pStr1 not NULL, pStr2 not NULL, lenStr2 > 0.
+static bool strStartWith(const char* pStr1, const char* pStr2, int lenStr2, bool bCaseSensitive)
 {
 	for(int i = 0; i < lenStr2; i++)
 	{
 		if(pStr1[i] == '\0') return false;
-		bool match = bCaseSensitive ? (pStr1[i] == pStr2[i]) : (tolower(pStr1[i]) == tolower(pStr2[i]));
-		if(!match) return false;
+		if(!matchchar(pStr1[i], pStr2[i], bCaseSensitive))
+			return false;
 	}
 	return true;
 }
@@ -80,7 +114,7 @@ const char* findFirstUnquotedStr(const char* pSourceStr, const char* pDestStr, b
 
 		if(!inQuote1 && !inQuote2)
 		{
-			if(matchStr2in1(p, pDestStr, lenDestStr, bCaseSensitive))
+			if(strStartWith(p, pDestStr, lenDestStr, bCaseSensitive))
 				return p;
 		}
 		p++;
@@ -97,7 +131,7 @@ const char* findFirstStr(const char* pSourceStr, const char* pDestStr, bool bCas
 	int lenDestStr = strlen(pDestStr);
 	while(c = *p)
 	{
-		if(matchStr2in1(p, pDestStr, lenDestStr, bCaseSensitive))
+		if(strStartWith(p, pDestStr, lenDestStr, bCaseSensitive))
 			return p;
 		p++;
 	}
@@ -163,12 +197,9 @@ void skipSpaceChars(char*& p)
 	}
 }
 
-const char* nextUnqotedSpaceChar(const char* p)
+inline const char* nextUnqotedSpaceChar(const char* p)
 {
-	const char* r = findFirstUnquotedChar(p, ' ');
-	if(!r)
-		r = findFirstUnquotedChar(p, '\t');
-	return r;
+	return findFirstUnquotedChars(p, " \n\r\t", 4, true);
 }
 
 char* duplicateStrAndUnquote(const char* str, size_t nChar)
@@ -239,6 +270,50 @@ HtmlNode* HtmlParser::newHtmlNode()
 	return pNode;
 }
 
+static void setNodePropText(HtmlNode* pNode, const char* pStart)
+{
+	while(isspace(*pStart)) pStart++;
+
+	if(pStart[0] == '>') return; //no prop text
+	if(pStart[0] == '/' && pStart[1] == '>')
+	{
+		pNode->flags |= FLAG_SELF_CLOSED_TAG; //自封闭标签
+		return; //no prop text
+	}
+
+	char* propText = duplicateStrUtill(pStart, '>', true);
+	if(propText)
+	{
+		int len = strlen(propText);
+		if(propText[len-1] == '/') //去掉最后可能会有的'/'字符, 如这种情况: <img src="..." />
+		{
+			propText[len-1] = '\0';
+			pNode->flags |= FLAG_SELF_CLOSED_TAG; //自封闭标签
+		}
+		pNode->text = propText;
+	}
+}
+
+static const char* s_LF = "\n"; //Unix,Linux
+static const char* s_CR = "\r"; //Mac
+static const char* s_CRLF = "\r\n"; //Windows
+
+// pNode != NULL, pStart != NULL, len > 0
+static void setContentNodeText(HtmlNode* pNode, const char* pStart, int len)
+{
+	//由于空行文本比较常见，每个行首标签的前面都可能有一个空行文本
+	//此处优化直接返回常量文本，以减少不必要的内存分配
+	//freeHtmlNodes()里释放pNode->text时需做相应的处理
+	if(len == 1 && pStart[0] == '\n') { pNode->text = (char*)s_LF; return; }
+
+	if(pStart[0] == '\r')
+	{
+		if(len == 1) { pNode->text = (char*)s_CR; return; }
+		if(len == 2 && pStart[1] == '\n') { pNode->text = (char*)s_CRLF; return; }
+	}
+	pNode->text = duplicateStr(pStart, len);
+}
+
 void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 {
 	freeHtmlNodes();
@@ -306,10 +381,10 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 		{
 			if(p > s)
 			{
-				//Add Text Node
+				//Add Content Node
 				pNode = newHtmlNode();
 				pNode->type = NODE_CONTENT;
-				pNode->text = duplicateStr(s, p - s);
+				setContentNodeText(pNode, s, p - s);
 				if(onNodeReady(pNode) == false) goto onuserend;
 			}
 
@@ -344,33 +419,33 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 				pNode->type = (*s == '/' ? NODE_CLOSE_TAG : NODE_START_TAG);
 				if(*s == '/') s++;
 				//这里得到的tagName可能包含一部分属性文本，需在下面修正
+				//tagName也可能是这种情况 a href="///////////////// （即缓冲区被填满,最后一个/是属性值中的字符）
 				copyStrUtill(pNode->tagName, MAX_HTML_TAG_LENGTH, s, '>', true);
-				int tagNamelen = strlen(pNode->tagName);
-				if(pNode->tagName[tagNamelen-1] == '/')
+				int tagNameLen = strlen(pNode->tagName);
+				if(tagNameLen < MAX_HTML_TAG_LENGTH && pNode->tagName[tagNameLen-1] == '/')
 				{
-					//处理自封闭的结点, 如<br/>, 删除tagName中可能会有的'/'字符
+					//处理自封闭的标签, 如<br/>, 删除tagName中可能会有的'/'字符
 					//自封闭的结点的type设置为NODE_START_TAG应该可以接受(否则要引入新的节点类型NODE_STARTCLOSE_TAG)
 					pNode->flags |= FLAG_SELF_CLOSED_TAG; //used by outputHtml()
-					pNode->tagName[tagNamelen-1] = '\0';
-					tagNamelen--;
+					pNode->tagName[tagNameLen-1] = '\0';
+					tagNameLen--;
 				}
 				//修正节点名称，提取属性文本(存入pNode->text)
-				for(int i = 0; i < tagNamelen; i++)
+				int i;
+				for(i = 0; i < tagNameLen; i++)
 				{
-					if(pNode->tagName[i] == ' ' //第一个空格后面跟的是属性文本
+					if(isspace(pNode->tagName[i])    //第一个空白字符后面跟的是属性文本
 						|| pNode->tagName[i] == '=') //扩展支持这种格式: <tagName=value>, 等效于<tagName tagName=value>
 					{
-						char* props = (pNode->tagName[i] == ' ' ? s + i + 1 : s);
-						pNode->text = duplicateStrUtill(props, '>', true);
-						if(pNode->text)
-						{
-							int nodeTextLen = strlen(pNode->text);
-							if(pNode->text[nodeTextLen-1] == '/') //去掉最后可能会有的'/'字符, 如这种情况: <img src="..." />
-								pNode->text[nodeTextLen-1] = '\0';
-						}
+						char* props = (pNode->tagName[i] == '=' ? s : s + i + 1);
+						setNodePropText(pNode, props); //此处也处理了自封闭标签
 						pNode->tagName[i] = '\0';
 						break;
 					}
+				}
+				if(i == tagNameLen)
+				{
+					//parse error, tag name is too long, MAX_HTML_TAG_LENGTH is too small
 				}
 
 				//识别节点类型(HtmlTagType) - 内部
@@ -399,10 +474,10 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 
 	if(p > s)
 	{
-		//Add Text Node
+		//Add Content Node
 		pNode = newHtmlNode();
 		pNode->type = NODE_CONTENT;
-		pNode->text = duplicateStr(s, -1);
+		setContentNodeText(pNode, s, strlen(s));
 		if(onNodeReady(pNode) == false) goto onuserend;
 	}
 
@@ -442,7 +517,12 @@ void HtmlParser::freeHtmlNodes()
 	{
 		HtmlNode* pNode = getHtmlNodes(i);
 		if(pNode->text)
-			freeDuplicatedStr(pNode->text);
+		{
+			if(pNode->type != NODE_CONTENT)
+				freeDuplicatedStr(pNode->text);
+			else if(pNode->text != s_CRLF && pNode->text != s_LF && pNode->text != s_CR) //see setContentNodeText()
+				freeDuplicatedStr(pNode->text);
+		}
 
 		if(pNode->props)
 		{
@@ -473,23 +553,33 @@ void HtmlParser::parseNodeProps(HtmlNode* pNode)
 		return; //don't parse <!DOCTYPE ...>'s text: not name=value syntax
 
 	char* p = pNode->text;
-	char *ps = NULL;
+	char* ps = NULL;
 	MemBuffer mem;
 
 	bool inQuote1 = false, inQuote2 = false;
 	char c;
 	while(c = *p)
 	{
-		if(c == '\"')
-		{
+		if(c == '\'')
 			inQuote1 = !inQuote1;
-		}
-		else if(c == '\'')
-		{
+		else if(c == '\"')
 			inQuote2 = !inQuote2;
+
+		bool notInQuote = (!inQuote1 && !inQuote2);
+
+		if(notInQuote && (c == '\"' || c == '\'') && !isspace(p[1]))
+		{
+			//处理属性值引号后面没有空白分隔符的情况：a="v1"b=v2 （这种错误写法不少见，应兼容之）
+			if(ps)
+			{
+				mem.appendPointer(duplicateStrAndUnquote(ps, p - ps + 1));
+				ps = NULL;
+			}
+			p++;
+			continue;
 		}
 
-		if((!inQuote1 && !inQuote2) && (c == ' ' || c == '\t' || c == '='))
+		if(notInQuote && (c == '=' || isspace(c)))
 		{
 			if(ps)
 			{

@@ -18,14 +18,15 @@ void main()
 	HtmlParser htmlParser;
 	MemBuffer  mem;
 
-	//to be fixed
-	htmlParser.parseHtml("<a\tx=1> <a\nx=1\ny=2> <a\r\nx=1\r\ny=2>", true); //非空格分隔符
-	htmlParser.parseHtml("<a x=\"abc\"y=0>", true); //属性之间没有分隔符，并不鲜见
+	htmlParser.parseHtml("<a url=xx>父母<陪孩子长大>: </a>"); //视为不合法?
+	htmlParser.parseHtml("<a value=野蛮肘击>", true); //'蛮'字GB18030编码影响解析?
+	htmlParser.parseHtml("<a alt=3岁120斤你信吗 src=罕见动物交配场景>", true); //'斤见物'等字GB18030编码影响解析?
+	htmlParser.parseHtml("<a url=\"abc\'def\'\" x=\'hello \"liigo\"\'>", true); //属性值双引号和单引号嵌套
 
 	testoutput("<!doctype html>"); //不要解析<!DOCTYPE ...>的属性，原样输出
 	testoutput("<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">");
-	testoutput("<hr/><p /><img src='...'/>"); //自封闭节点
-	testoutput("<a defer url=liigo.com selected>"); //属性没有值
+	testoutput("<hr/><p /><img src='...'/>"); //自封闭标签
+	testoutput("<a defer url=liigo.com x='' selected>"); //属性没有值
 
 	htmlParser.parseHtml("<script rel=\"next\" href=\"objects.html\">", true);
 	htmlParser.parseHtml("...<p>---<a href=url>link</a>...");
@@ -38,6 +39,11 @@ void main()
 	htmlParser.parseHtml("<p><!--**<p></p>**--><x/>...</p>");
 	htmlParser.parseHtml("<style>..<p.><<.every things here, all in style</style>");
 	htmlParser.parseHtml("<script>..<p.><<.every things here, all in script</script>");
+
+	htmlParser.parseHtml("<a href=\"http://www.163.com\">");  //确认解析后不是自封闭标签
+	htmlParser.parseHtml("<a href=\"http://www.163.com\"/>"); //确认解析后是自封闭标签
+	htmlParser.parseHtml("<a\tx=1> <a\nx=1\ny=2> <a\r\nx=1\r\ny=2>", true); //非空格分隔符
+	htmlParser.parseHtml("<a x=\"abc\"y=''z>", true); //属性值引号后面没有空白分隔符，并不鲜见
 
 	testfile("testfiles\\sina.com.cn.html");
 	testfile("testfiles\\163.com.html");
