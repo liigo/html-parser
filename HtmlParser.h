@@ -109,6 +109,7 @@ enum HtmlTagType
 enum HtmlNodeFlag
 {
 	FLAG_SELF_CLOSED_TAG = 1 << 0, //自封闭标签: <br/>
+	FLAG_IS_CDATA_BLOCK  = 1 << 1, //是CDATA区块
 };
 
 struct HtmlNodeProp

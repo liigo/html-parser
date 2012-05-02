@@ -388,23 +388,46 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 				if(onNodeReady(pNode) == false) goto onuserend;
 			}
 
-			//处理HTML注释 <!-- -->
-			if(p[1] == '!' && p[2] == '-' && p[3] == '-')
+			//处理HTML注释或CDATA
+			if(p[1] == '!')
 			{
-				const char* pEndRemarks = findFirstStr(p + 4, "-->", true);
-				if(pEndRemarks)
+				if(p[2] == '-' && p[3] == '-')
 				{
-					//Add Remarks Node
-					pNode = newHtmlNode();
-					pNode->type = NODE_REMARKS;
-					pNode->text = duplicateStr(p + 4, pEndRemarks - (p + 4));
-					if(onNodeReady(pNode) == false) goto onuserend;
-					s = p = (char*)pEndRemarks + 3;
-					bInsideTag = bInQuote1 = bInQuote2 = false;
-					continue;
+					//注释: <!-- ... -->
+					const char* pEndRemarks = findFirstStr(p + 4, "-->", true);
+					if(pEndRemarks)
+					{
+						//Add Remarks Node
+						pNode = newHtmlNode();
+						pNode->type = NODE_REMARKS;
+						pNode->text = duplicateStr(p + 4, pEndRemarks - (p + 4));
+						if(onNodeReady(pNode) == false) goto onuserend;
+						s = p = (char*)pEndRemarks + 3;
+						bInsideTag = bInQuote1 = bInQuote2 = false;
+						continue;
+					}
+					//else: no -->, not very bad, try continue parsing
 				}
-				//else: no -->, not very bad, try continue parsing
+				else if(p[2] == '[' && strStartWith(p+3, "CDATA[", 5, false))
+				{
+					//CDATA: <![CDATA[ ... ]]>
+					const char* pEndCData = findFirstStr(p + 9, "]]>", true);
+					if(pEndCData)
+					{
+						//Add Content Node with CDATA flag
+						pNode = newHtmlNode();
+						pNode->type = NODE_CONTENT;
+						pNode->text = duplicateStr(p + 9, pEndCData - (p + 9));
+						pNode->flags |= FLAG_IS_CDATA_BLOCK; //CDATA标记, used by outputHtml()
+						if(onNodeReady(pNode) == false) goto onuserend;
+						s = p = (char*)pEndCData + 3;
+						bInsideTag = bInQuote1 = bInQuote2 = false;
+						continue;
+					}
+					//else: no ]]>, not very bad, try contiune parsing
+				}
 			}
+
 
 			s = p + 1;
 			bInsideTag = true; bInQuote1 = bInQuote2 = false;
@@ -692,6 +715,8 @@ void HtmlParser::outputHtmlNodes(FILE* f)
 			fprintf(f, ", text: %s", pNode->text);
 		if(pNode->flags & FLAG_SELF_CLOSED_TAG)
 			fprintf(f, ", flags: />"); //自封闭
+		if(pNode->flags & FLAG_IS_CDATA_BLOCK)
+			fprintf(f, ", flags: CDATA"); //CDATA
 		fprintf(f, "\r\n");
 
 		if(pNode->propCount > 0)
@@ -725,7 +750,14 @@ void HtmlParser::outputHtml(MemBuffer& buffer, bool keepBufferData)
 		switch(pNode->type)
 		{
 		case NODE_CONTENT:
-			buffer.appendText(pNode->text);
+			if(pNode->flags & FLAG_IS_CDATA_BLOCK)
+			{
+				buffer.appendText("<![CDATA[", 9);
+				buffer.appendText(pNode->text);
+				buffer.appendText("]]>", 3);
+			}
+			else
+				buffer.appendText(pNode->text);
 			break;
 		case NODE_START_TAG:
 			buffer.appendChar('<');

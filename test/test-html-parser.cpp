@@ -23,6 +23,7 @@ void main()
 	htmlParser.parseHtml("<a alt=3岁120斤你信吗 src=罕见动物交配场景>", true); //'斤见物'等字GB18030编码影响解析?
 	htmlParser.parseHtml("<a url=\"abc\'def\'\" x=\'hello \"liigo\"\'>", true); //属性值双引号和单引号嵌套
 
+	testoutput("abc<![CDATA[<<a/>>]]>xyz"); //正确解析CDATA
 	testoutput("<!doctype html>"); //不要解析<!DOCTYPE ...>的属性，原样输出
 	testoutput("<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">");
 	testoutput("<hr/><p /><img src='...'/>"); //自封闭标签
