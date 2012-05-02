@@ -20,8 +20,7 @@ void main()
 
 	htmlParser.parseHtml("<a url=xx>父母<陪孩子长大>: </a>"); //视为不合法?
 	htmlParser.parseHtml("<a value=野蛮肘击>", true); //'蛮'字GB18030编码影响解析?
-	htmlParser.parseHtml("<a alt=3岁120斤你信吗 src=罕见动物交配场景>", true); //'斤见物'等字GB18030编码影响解析?
-	htmlParser.parseHtml("<a url=\"abc\'def\'\" x=\'hello \"liigo\"\'>", true); //属性值双引号和单引号嵌套
+	htmlParser.parseHtml("<a alt=3岁120斤你信吗 src=罕见动物交配场景>", true); //'斤见物'等字GB18030编码影响解析?	
 
 	testoutput("abc<![CDATA[<<a/>>]]>xyz"); //正确解析CDATA
 	testoutput("<!doctype html>"); //不要解析<!DOCTYPE ...>的属性，原样输出
@@ -33,6 +32,7 @@ void main()
 	htmlParser.parseHtml("...<p>---<a href=url>link</a>...");
 	htmlParser.parseHtml("<p>---< a   href=url >link</a>");
 	htmlParser.parseHtml("<a x=a y=b z = \"c <a href=url>\" >", true); //属性值引号内有<或>不要影响解析
+	htmlParser.parseHtml("<a url=\"abc\'def\'\" x=\'hello \"liigo\"\'>", true); //属性值双引号和单引号嵌套
 	htmlParser.parseHtml("<p>\"引号”不匹配</p>");
 	htmlParser.parseHtml("<a x=0> <b y=1> <img z=ok w=false> - </img>", true);
 	htmlParser.parseHtml("<color=red>");
@@ -46,6 +46,7 @@ void main()
 	htmlParser.parseHtml("<a\tx=1> <a\nx=1\ny=2> <a\r\nx=1\r\ny=2>", true); //非空格分隔符
 	htmlParser.parseHtml("<a x=\"abc\"y=''z>", true); //属性值引号后面没有空白分隔符，并不鲜见
 
+	//测试解析各大门户网站
 	testfile("testfiles\\sina.com.cn.html");
 	testfile("testfiles\\163.com.html");
 	testfile("testfiles\\qq.com.html");
