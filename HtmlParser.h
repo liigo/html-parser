@@ -79,7 +79,7 @@ enum HtmlNodeType
 {
 	NODE_UNKNOWN = 0,
 	NODE_START_TAG, //开始标签，如 <a href="liigo.com"> 或 <br/>
-	NODE_CLOSE_TAG, //结束标签，如 </a>
+	NODE_END_TAG,   //结束标签，如 </a>
 	NODE_CONTENT,   //内容: 介于开始标签或结束标签之间的普通文本
 	NODE_REMARKS,   //注释: <!-- -->
 };
@@ -107,11 +107,11 @@ enum HtmlTagType
 
 enum HtmlNodeFlag
 {
-	FLAG_SELF_CLOSED_TAG = 1 << 0, //自封闭标签: <br/>
-	FLAG_IS_CDATA_BLOCK  = 1 << 1, //是CDATA区块
+	FLAG_SELF_CLOSING_TAG = 1 << 0, //自封闭标签: <br/>
+	FLAG_CDATA_BLOCK      = 1 << 1, //是CDATA区块
 };
 
-struct HtmlNodeProp
+struct HtmlAttribute
 {
 	char* szName;
 	char* szValue;
@@ -122,13 +122,13 @@ struct HtmlNodeProp
 struct HtmlNode
 {
 	HtmlNodeType type;    //节点类型
-	HtmlTagType  tagType; //标签类型（仅当节点类型为NODE_START_TAG或NODE_CLOSE_TAG时有意义）
+	HtmlTagType  tagType; //标签类型（仅当节点类型为NODE_START_TAG或NODE_END_TAG时有意义）
 	char tagName[MAX_HTML_TAG_LENGTH+1]; //标签名称（如<A href="...">对应的标签名称为"A"）
 	char* text; //文本，视标签类型(tagType)不同意义也不同，可能为NULL
 				//如果type==NODE_START_TAG, text指向标签名称后面的属性文本
 				//如果type==NODE_CONTENT或NODE_REMARKS, text指向内容或注释文本
-	int propCount;        //属性个数（仅当属性被解析后有效，参见HtmlParser.parseNodeProps()，下同）
-	HtmlNodeProp* props;  //属性（名称=值），参见HtmlParser.getNodeProp()
+	int attributeCount;        //属性个数（仅当属性被解析后有效，参见HtmlParser.parseAttributes()，下同）
+	HtmlAttribute* attributes;  //属性（名称=值），参见HtmlParser.getAttribute()
 	size_t flags;    //bit OR of HtmlNodeFlag
 	char* pInternal; //reserved for internal usage
 	void* pUser;     //user customized, default to NULL
@@ -153,17 +153,18 @@ public:
 
 	//nodes
 	size_t getHtmlNodeCount();
-	HtmlNode* getHtmlNodes(size_t index); //must: 0 <= index < getHtmlNodeCount()
+	HtmlNode* getHtmlNode(size_t index); //must: 0 <= index < getHtmlNodeCount()
 	void freeHtmlNodes();
-	//props
-	const HtmlNodeProp* getNodeProp(const HtmlNode* pNode, size_t index); //must: 0 <= index < pNode->propCount
-	const HtmlNodeProp* getNodeProp(const HtmlNode* pNode, const char* szPropName); //return NULL if prop not exist
-	const char* getNodePropStringValue(const HtmlNode* pNode, const char* szPropName, const char* szDefaultValue = NULL);
-	int getNodePropIntValue(const HtmlNode* pNode, const char* szPropName, int defaultValue = 0);
-	void parseNodeProps(HtmlNode* pNode); //解析节点属性
+	//attributes
+	const HtmlAttribute* getAttribute(const HtmlNode* pNode, size_t index); //must: 0 <= index < pNode->attributeCount
+	const HtmlAttribute* getAttribute(const HtmlNode* pNode, const char* szAttributeName); //return NULL if attribute not exist
+	const char* getAttributeStringValue(const HtmlNode* pNode, const char* szAttributeName, const char* szDefaultValue = NULL);
+	int getAttributeIntValue(const HtmlNode* pNode, const char* szAttributeName, int defaultValue = 0);
+	void parseAttributes(HtmlNode* pNode); //解析节点属性
 	//output
-	void outputHtmlNodes(FILE* f = stdout);
 	void outputHtml(MemBuffer& buffer, bool keepBufferData = false);
+	void outputHtmlNode(MemBuffer& buffer, const HtmlNode* pNode);
+	void dumpHtmlNodes(FILE* f = stdout);
 
 protected:
 	//允许子类覆盖, 以便识别更多标签(提高解析质量), 或者识别更少标签(提高解析速度)
@@ -172,7 +173,7 @@ protected:
 	//允许子类覆盖, 以便更好的解析节点属性, 或者部分解析甚至干脆不解析节点属性(提高解析速度)
 	//可以根据标签名称(pNode->tagName)或标签类型(pNode->tagType)判断是否需要解析属性
 	//默认仅解析已识别出标签类型的开始标签的属性（即pNode->type == NODE_START_TAG && pNode->tagType != NODE_UNKNOWN）
-	virtual void onParseNodeProps(HtmlNode* pNode);
+	virtual void onParseAttributes(HtmlNode* pNode);
 	//允许子类覆盖, 在某节点解析完成后被调用, 如果返回false则立刻停止解析HTML
 	//这里也许是一个恰当的时机初始化pNode.pUser
 	virtual bool onNodeReady(HtmlNode* pNode) { return true; }

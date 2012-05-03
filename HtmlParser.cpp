@@ -199,7 +199,7 @@ void skipSpaceChars(char*& p)
 
 inline const char* nextUnqotedSpaceChar(const char* p)
 {
-	return findFirstUnquotedChars(p, " \n\r\t", 4, true);
+	return findFirstUnquotedChars(p, " \n\r\t\f", 5, true);
 }
 
 char* duplicateStrAndUnquote(const char* str, size_t nChar)
@@ -233,7 +233,7 @@ static HtmlTagType identifyHtmlTag_Internal(const char* szTagName)
 	static N2T n2tTable[] = 
 	{
 		{ "SCRIPT", TAG_SCRIPT },
-		{ "STYLE", TAG_STYLE },
+		{ "STYLE",  TAG_STYLE  },
 	};
 
 	return identifyHtmlTagInTable(szTagName, n2tTable, sizeof(n2tTable)/sizeof(n2tTable[0]));
@@ -250,12 +250,12 @@ HtmlTagType HtmlParser::onIdentifyHtmlTag(const char* szTagName, HtmlNodeType no
 
 	static N2T n2tTable[] = 
 	{
-		{ "A", TAG_A },
-		{ "IMG", TAG_IMG },
-		{ "META", TAG_META },
-		{ "BODY", TAG_BODY },
-		{ "TITLE", TAG_TITLE },
-		{ "FRAME", TAG_FRAME },
+		{ "A",      TAG_A      },
+		{ "IMG",    TAG_IMG    },
+		{ "META",   TAG_META   },
+		{ "BODY",   TAG_BODY   },
+		{ "TITLE",  TAG_TITLE  },
+		{ "FRAME",  TAG_FRAME  },
 		{ "IFRAME", TAG_IFRAME },
 	};
 
@@ -270,27 +270,27 @@ HtmlNode* HtmlParser::newHtmlNode()
 	return pNode;
 }
 
-static void setNodePropText(HtmlNode* pNode, const char* pStart)
+static void setNodeAttributeText(HtmlNode* pNode, const char* pStart)
 {
 	while(isspace(*pStart)) pStart++;
 
-	if(pStart[0] == '>') return; //no prop text
+	if(pStart[0] == '>') return; //no attribute text
 	if(pStart[0] == '/' && pStart[1] == '>')
 	{
-		pNode->flags |= FLAG_SELF_CLOSED_TAG; //自封闭标签
-		return; //no prop text
+		pNode->flags |= FLAG_SELF_CLOSING_TAG; //自封闭标签
+		return; //no attribute text
 	}
 
-	char* propText = duplicateStrUtill(pStart, '>', true);
-	if(propText)
+	char* attributeText = duplicateStrUtill(pStart, '>', true);
+	if(attributeText)
 	{
-		int len = strlen(propText);
-		if(propText[len-1] == '/') //去掉最后可能会有的'/'字符, 如这种情况: <img src="..." />
+		int len = strlen(attributeText);
+		if(attributeText[len-1] == '/') //去掉最后可能会有的'/'字符, 如这种情况: <img src="..." />
 		{
-			propText[len-1] = '\0';
-			pNode->flags |= FLAG_SELF_CLOSED_TAG; //自封闭标签
+			attributeText[len-1] = '\0';
+			pNode->flags |= FLAG_SELF_CLOSING_TAG; //自封闭标签
 		}
-		pNode->text = propText;
+		pNode->text = attributeText;
 	}
 }
 
@@ -314,7 +314,7 @@ static void setContentNodeText(HtmlNode* pNode, const char* pStart, int len)
 	pNode->text = duplicateStr(pStart, len);
 }
 
-void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
+void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 {
 	freeHtmlNodes();
 	if(szHtml == NULL || *szHtml == '\0') return;
@@ -418,7 +418,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 						pNode = newHtmlNode();
 						pNode->type = NODE_CONTENT;
 						pNode->text = duplicateStr(p + 9, pEndCData - (p + 9));
-						pNode->flags |= FLAG_IS_CDATA_BLOCK; //CDATA标记, used by outputHtml()
+						pNode->flags |= FLAG_CDATA_BLOCK; //CDATA标记, used by outputHtml()
 						if(onNodeReady(pNode) == false) goto onuserend;
 						s = p = (char*)pEndCData + 3;
 						bInsideTag = bInQuote1 = bInQuote2 = false;
@@ -439,7 +439,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 				//创建新节点(HtmlNode)，得到节点类型(NodeType)和名称(TagName)
 				pNode = newHtmlNode();
 				while(isspace(*s)) s++;
-				pNode->type = (*s == '/' ? NODE_CLOSE_TAG : NODE_START_TAG);
+				pNode->type = (*s == '/' ? NODE_END_TAG : NODE_START_TAG);
 				if(*s == '/') s++;
 				//这里得到的tagName可能包含一部分属性文本，需在下面修正
 				//tagName也可能是这种情况 a href="///////////////// （即缓冲区被填满,最后一个/是属性值中的字符）
@@ -449,7 +449,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 				{
 					//处理自封闭的标签, 如<br/>, 删除tagName中可能会有的'/'字符
 					//自封闭的结点的type设置为NODE_START_TAG应该可以接受(否则要引入新的节点类型NODE_STARTCLOSE_TAG)
-					pNode->flags |= FLAG_SELF_CLOSED_TAG; //used by outputHtml()
+					pNode->flags |= FLAG_SELF_CLOSING_TAG; //used by outputHtml()
 					pNode->tagName[tagNameLen-1] = '\0';
 					tagNameLen--;
 				}
@@ -460,8 +460,8 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 					if(isspace(pNode->tagName[i])    //第一个空白字符后面跟的是属性文本
 						|| pNode->tagName[i] == '=') //扩展支持这种格式: <tagName=value>, 等效于<tagName tagName=value>
 					{
-						char* props = (pNode->tagName[i] == '=' ? s : s + i + 1);
-						setNodePropText(pNode, props); //此处也处理了自封闭标签
+						char* attributes = (pNode->tagName[i] == '=' ? s : s + i + 1);
+						setNodeAttributeText(pNode, attributes); //此处也处理了自封闭标签
 						pNode->tagName[i] = '\0';
 						break;
 					}
@@ -482,8 +482,8 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseProps)
 					pNode->tagType = onIdentifyHtmlTag(pNode->tagName, pNode->type);
 
 				//解析节点属性
-				if(pNode->type == NODE_START_TAG && parseProps && pNode->text)
-					onParseNodeProps(pNode);
+				if(pNode->type == NODE_START_TAG && parseAttributes && pNode->text)
+					onParseAttributes(pNode);
 
 				if(onNodeReady(pNode) == false) goto onuserend;
 			}
@@ -520,7 +520,7 @@ onuserend:
 
 dumpnodes:
 #ifdef _DEBUG
-	outputHtmlNodes(); //just for test
+	dumpHtmlNodes(); //just for test
 #endif
 }
 
@@ -529,7 +529,7 @@ size_t HtmlParser::getHtmlNodeCount()
 	return (size_t)(m_HtmlNodes.getDataSize() / sizeof(HtmlNode));
 }
 
-HtmlNode* HtmlParser::getHtmlNodes(size_t index)
+HtmlNode* HtmlParser::getHtmlNode(size_t index)
 {
 	return (HtmlNode*)m_HtmlNodes.getData() + index;
 }
@@ -538,7 +538,7 @@ void HtmlParser::freeHtmlNodes()
 {
 	for(int i = 0, count = getHtmlNodeCount(); i < count; i++)
 	{
-		HtmlNode* pNode = getHtmlNodes(i);
+		HtmlNode* pNode = getHtmlNode(i);
 		if(pNode->text)
 		{
 			if(pNode->type != NODE_CONTENT)
@@ -547,30 +547,30 @@ void HtmlParser::freeHtmlNodes()
 				freeDuplicatedStr(pNode->text);
 		}
 
-		if(pNode->props)
+		if(pNode->attributes)
 		{
-			for(int propIndex = 0; propIndex < pNode->propCount; propIndex++)
+			for(int attributeIndex = 0; attributeIndex < pNode->attributeCount; attributeIndex++)
 			{
-				HtmlNodeProp* prop = pNode->props + propIndex;
-				if(prop->szName)  freeDuplicatedStr(prop->szName);
-				if(prop->szValue) freeDuplicatedStr(prop->szValue);
+				HtmlAttribute* attribute = pNode->attributes + attributeIndex;
+				if(attribute->szName)  freeDuplicatedStr(attribute->szName);
+				if(attribute->szValue) freeDuplicatedStr(attribute->szValue);
 			}
-			free(pNode->props); //see: HtmlParser.parseNodeProps(), MemBuffer.detach()
+			free(pNode->attributes); //see: HtmlParser.parseAttributes(), MemBuffer.detach()
 		}
 	}
 	m_HtmlNodes.clean();
 }
 
 //[virtual]
-void HtmlParser::onParseNodeProps(HtmlNode* pNode)
+void HtmlParser::onParseAttributes(HtmlNode* pNode)
 {
 	if(pNode->tagType != NODE_UNKNOWN)
-		parseNodeProps(pNode);
+		parseAttributes(pNode);
 }
 
-void HtmlParser::parseNodeProps(HtmlNode* pNode)
+void HtmlParser::parseAttributes(HtmlNode* pNode)
 {
-	if(pNode == NULL || pNode->propCount > 0 || pNode->text == NULL)
+	if(pNode == NULL || pNode->attributeCount > 0 || pNode->text == NULL)
 		return;
 	if(pNode->tagName[0] == '!' && stricmp(pNode->tagName+1, "DOCTYPE") == 0)
 		return; //don't parse <!DOCTYPE ...>'s text: not name=value syntax
@@ -629,68 +629,68 @@ void HtmlParser::parseNodeProps(HtmlNode* pNode)
 
 	char** pp = (char**) mem.getData();
 
-	MemBuffer props;
+	MemBuffer attributes;
 	for(int i = 0, n = mem.getDataSize() / sizeof(char*) - 2; i < n; i++)
 	{
-		props.appendPointer(pp[i]); //prop name
+		attributes.appendPointer(pp[i]); //attribute name
 		if(pp[i+1] == NULL)
 		{
-			props.appendPointer(pp[i+2]); //prop value
+			attributes.appendPointer(pp[i+2]); //attribute value
 			i += 2;
 		}
 		else
-			props.appendPointer(NULL); //prop vlalue
+			attributes.appendPointer(NULL); //attribute vlalue
 	}
 
-	pNode->propCount = props.getDataSize() / sizeof(char*) / 2;
-	pNode->props = (HtmlNodeProp*) props.getData();
-	props.detach();
+	pNode->attributeCount = attributes.getDataSize() / sizeof(char*) / 2;
+	pNode->attributes = (HtmlAttribute*) attributes.getData();
+	attributes.detach();
 }
 
-const HtmlNodeProp* HtmlParser::getNodeProp(const HtmlNode* pNode, size_t index)
+const HtmlAttribute* HtmlParser::getAttribute(const HtmlNode* pNode, size_t index)
 {
-	return pNode->props + index;
+	return pNode->attributes + index;
 }
 
-const HtmlNodeProp* HtmlParser::getNodeProp(const HtmlNode* pNode, const char* szPropName)
+const HtmlAttribute* HtmlParser::getAttribute(const HtmlNode* pNode, const char* szAttributeName)
 {
-	if(pNode == NULL || pNode->propCount <= 0)
+	if(pNode == NULL || pNode->attributeCount <= 0)
 		return NULL;
 
-	for(int i = 0; i < pNode->propCount; i++)
+	for(int i = 0; i < pNode->attributeCount; i++)
 	{
-		HtmlNodeProp* prop = pNode->props + i;
-		if(stricmp(prop->szName, szPropName) == 0)
-			return prop;
+		HtmlAttribute* attribute = pNode->attributes + i;
+		if(stricmp(attribute->szName, szAttributeName) == 0)
+			return attribute;
 	}
 	return NULL;
 }
 
-const char* HtmlParser::getNodePropStringValue(const HtmlNode* pNode, const char* szPropName, const char* szDefaultValue /*= NULL*/)
+const char* HtmlParser::getAttributeStringValue(const HtmlNode* pNode, const char* szAttributeName, const char* szDefaultValue /*= NULL*/)
 {
-	const HtmlNodeProp* pProp = getNodeProp(pNode, szPropName);
-	if(pProp)
-		return pProp->szValue;
+	const HtmlAttribute* pAttribute = getAttribute(pNode, szAttributeName);
+	if(pAttribute)
+		return pAttribute->szValue;
 	else
 		return szDefaultValue;
 }
 
-int HtmlParser::getNodePropIntValue(const HtmlNode* pNode, const char* szPropName, int defaultValue /*= 0*/)
+int HtmlParser::getAttributeIntValue(const HtmlNode* pNode, const char* szAttributeName, int defaultValue /*= 0*/)
 {
-	const HtmlNodeProp* pProp = getNodeProp(pNode, szPropName);
-	if(pProp && pProp->szValue)
-		return atoi(pProp->szValue);
+	const HtmlAttribute* pAttribute = getAttribute(pNode, szAttributeName);
+	if(pAttribute && pAttribute->szValue)
+		return atoi(pAttribute->szValue);
 	else
 		return defaultValue;
 }
 
-void HtmlParser::outputHtmlNodes(FILE* f)
+void HtmlParser::dumpHtmlNodes(FILE* f)
 {
 	char buffer[256] = {0};
-	fprintf(f, "\r\n-------- begin HtmlParser.outputHtmlNodes() --------\r\n");
+	fprintf(f, "\r\n-------- begin HtmlParser.dumpHtmlNodes() --------\r\n");
 	for(int i = 0, count = getHtmlNodeCount(); i < count; i++)
 	{
-		HtmlNode* pNode = getHtmlNodes(i);
+		HtmlNode* pNode = getHtmlNode(i);
 		switch(pNode->type)
 		{
 		case NODE_CONTENT:
@@ -699,8 +699,8 @@ void HtmlParser::outputHtmlNodes(FILE* f)
 		case NODE_START_TAG:
 			sprintf(buffer, "%2d) type: NODE_START_TAG, tagName: %s (%d)", i, pNode->tagName, pNode->tagType);
 			break;
-		case NODE_CLOSE_TAG:
-			sprintf(buffer, "%2d) type: NODE_CLOSE_TAG, tagName: %s (%d)", i, pNode->tagName, pNode->tagType);
+		case NODE_END_TAG:
+			sprintf(buffer, "%2d) type: NODE_END_TAG, tagName: %s (%d)", i, pNode->tagName, pNode->tagType);
 			break;
 		case NODE_REMARKS:
 			sprintf(buffer, "%2d) type: NODE_REMARKS", i);
@@ -713,23 +713,23 @@ void HtmlParser::outputHtmlNodes(FILE* f)
 		fprintf(f, "%s", buffer);
 		if(pNode->text)
 			fprintf(f, ", text: %s", pNode->text);
-		if(pNode->flags & FLAG_SELF_CLOSED_TAG)
+		if(pNode->flags & FLAG_SELF_CLOSING_TAG)
 			fprintf(f, ", flags: />"); //自封闭
-		if(pNode->flags & FLAG_IS_CDATA_BLOCK)
+		if(pNode->flags & FLAG_CDATA_BLOCK)
 			fprintf(f, ", flags: CDATA"); //CDATA
 		fprintf(f, "\r\n");
 
-		if(pNode->propCount > 0)
+		if(pNode->attributeCount > 0)
 		{
-			fprintf(f, "    props: ");
-			for(int i = 0; i < pNode->propCount; i++)
+			fprintf(f, "    attributes: ");
+			for(int i = 0; i < pNode->attributeCount; i++)
 			{
-				HtmlNodeProp* prop = pNode->props + i;
-				if(prop->szValue)
-					fprintf(f, "%s = \"%s\"", prop->szName, prop->szValue);
+				HtmlAttribute* attribute = pNode->attributes + i;
+				if(attribute->szValue)
+					fprintf(f, "%s = \"%s\"", attribute->szName, attribute->szValue);
 				else
-					fprintf(f, "%s", prop->szName);
-				if(i < pNode->propCount - 1)
+					fprintf(f, "%s", attribute->szName);
+				if(i < pNode->attributeCount - 1)
 				{
 					fprintf(f, ", ");
 				}
@@ -737,71 +737,82 @@ void HtmlParser::outputHtmlNodes(FILE* f)
 			fprintf(f, "\r\n");
 		}
 	}
-	fprintf(f, "-------- end of HtmlParser.outputHtmlNodes() --------\r\n");
+	fprintf(f, "-------- end of HtmlParser.dumpHtmlNodes() --------\r\n");
 }
 
 void HtmlParser::outputHtml(MemBuffer& buffer, bool keepBufferData)
 {
 	if(!keepBufferData) buffer.empty();
-	int propIndex = 0;
 	for(int nodeIndex = 0, count = getHtmlNodeCount(); nodeIndex < count; nodeIndex++)
 	{
-		HtmlNode* pNode = getHtmlNodes(nodeIndex);
-		switch(pNode->type)
+		HtmlNode* pNode = getHtmlNode(nodeIndex);
+		outputHtmlNode(buffer, static_cast<const HtmlNode*>(pNode));
+	}
+}
+
+void HtmlParser::outputHtmlNode(MemBuffer& buffer, const HtmlNode* pNode)
+{
+	int attributeIndex = 0;
+
+	if(pNode == NULL)
+		return;
+
+	switch(pNode->type)
+	{
+	case NODE_CONTENT:
+		if(pNode->flags & FLAG_CDATA_BLOCK)
 		{
-		case NODE_CONTENT:
-			if(pNode->flags & FLAG_IS_CDATA_BLOCK)
-			{
-				buffer.appendText("<![CDATA[", 9);
-				buffer.appendText(pNode->text);
-				buffer.appendText("]]>", 3);
-			}
-			else
-				buffer.appendText(pNode->text);
-			break;
-		case NODE_START_TAG:
-			buffer.appendChar('<');
-			buffer.appendText(pNode->tagName);
-			if(pNode->propCount > 0)
-				buffer.appendChar(' ');
-			for(propIndex = 0; propIndex < pNode->propCount; propIndex++)
-			{
-				const HtmlNodeProp* pProp = getNodeProp(pNode, propIndex);
-				buffer.appendText(pProp->szName);
-				if(pProp->szValue)
-				{
-					buffer.appendText("=\"");
-					buffer.appendText(pProp->szValue);
-					buffer.appendChar('\"');
-				}
-				if(propIndex < pNode->propCount - 1)
-					buffer.appendChar(' ');
-			}
-			if(pNode->propCount == 0 && pNode->text) //比如 <!DOCTYPE ...>
-			{
-				buffer.appendChar(' ');
-				buffer.appendText(pNode->text);
-			}
-			if(pNode->flags & FLAG_SELF_CLOSED_TAG)
-				buffer.appendChar('/'); //自封闭
-			buffer.appendChar('>');
-			break;
-		case NODE_CLOSE_TAG:
-			buffer.appendText("</");
-			buffer.appendText(pNode->tagName);
-			buffer.appendChar('>');
-			break;
-		case NODE_REMARKS:
-			buffer.appendText("<!--");
+			buffer.appendText("<![CDATA[", 9);
 			buffer.appendText(pNode->text);
-			buffer.appendText("-->");
-			break;
-		case NODE_UNKNOWN:
-		default:
-			fprintf(stderr, "HtmlParser.outputHtml(): NODE_UNKNOWN\n");
-			break;
-		} //end switch
-	}//end for
+			buffer.appendText("]]>", 3);
+		}
+		else
+			buffer.appendText(pNode->text);
+		break;
+	case NODE_START_TAG:
+		buffer.appendChar('<');
+		buffer.appendText(pNode->tagName);
+		if(pNode->attributeCount > 0)
+			buffer.appendChar(' ');
+		for(attributeIndex = 0; attributeIndex < pNode->attributeCount; attributeIndex++)
+		{
+			const HtmlAttribute* pAttribute = getAttribute(pNode, attributeIndex);
+			buffer.appendText(pAttribute->szName);
+			if(pAttribute->szValue)
+			{
+				bool hasQuoteChar = (strchr(pAttribute->szValue, '\"') != NULL);
+				buffer.appendChar('=');
+				buffer.appendChar(hasQuoteChar ? '\'' : '\"');
+				buffer.appendText(pAttribute->szValue);
+				buffer.appendChar(hasQuoteChar ? '\'' : '\"');
+			}
+			if(attributeIndex < pNode->attributeCount - 1)
+				buffer.appendChar(' ');
+		}
+		if(pNode->attributeCount == 0 && pNode->text) //比如 <!DOCTYPE ...>
+		{
+			buffer.appendChar(' ');
+			buffer.appendText(pNode->text);
+		}
+		if(pNode->flags & FLAG_SELF_CLOSING_TAG)
+			buffer.appendChar('/'); //自封闭
+		buffer.appendChar('>');
+		break;
+	case NODE_END_TAG:
+		buffer.appendText("</");
+		buffer.appendText(pNode->tagName);
+		buffer.appendChar('>');
+		break;
+	case NODE_REMARKS:
+		buffer.appendText("<!--");
+		buffer.appendText(pNode->text);
+		buffer.appendText("-->");
+		break;
+	case NODE_UNKNOWN:
+	default:
+		fprintf(stderr, "HtmlParser.outputHtmlNode(): NODE_UNKNOWN\n");
+		break;
+	} //end switch
 }
 
 //-----------------------------------------------------------------------------

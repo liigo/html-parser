@@ -4,9 +4,9 @@ using namespace liigo;
 
 class ParseAll : public HtmlParser
 {
-	virtual void onParseNodeProps(HtmlNode* pNode)
+	virtual void onParseAttributes(HtmlNode* pNode)
 	{
-		parseNodeProps(pNode);
+		parseAttributes(pNode);
 	}
 };
 
@@ -27,12 +27,12 @@ void main()
 	testoutput("<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">");
 	testoutput("<hr/><p /><img src='...'/>"); //自封闭标签
 	testoutput("<a defer url=liigo.com x='' selected>"); //属性没有值
+	testoutput("<a url=\"abc\'def\'\" x=\'hello \"liigo\"\'>"); //属性值双引号和单引号嵌套
 
 	htmlParser.parseHtml("<script rel=\"next\" href=\"objects.html\">", true);
 	htmlParser.parseHtml("...<p>---<a href=url>link</a>...");
 	htmlParser.parseHtml("<p>---< a   href=url >link</a>");
 	htmlParser.parseHtml("<a x=a y=b z = \"c <a href=url>\" >", true); //属性值引号内有<或>不要影响解析
-	htmlParser.parseHtml("<a url=\"abc\'def\'\" x=\'hello \"liigo\"\'>", true); //属性值双引号和单引号嵌套
 	htmlParser.parseHtml("<p>\"引号”不匹配</p>");
 	htmlParser.parseHtml("<a x=0> <b y=1> <img z=ok w=false> - </img>", true);
 	htmlParser.parseHtml("<color=red>");
@@ -40,7 +40,6 @@ void main()
 	htmlParser.parseHtml("<p><!--**<p></p>**--><x/>...</p>");
 	htmlParser.parseHtml("<style>..<p.><<.every things here, all in style</style>");
 	htmlParser.parseHtml("<script>..<p.><<.every things here, all in script</script>");
-
 	htmlParser.parseHtml("<a href=\"http://www.163.com\">");  //确认解析后不是自封闭标签
 	htmlParser.parseHtml("<a href=\"http://www.163.com\"/>"); //确认解析后是自封闭标签
 	htmlParser.parseHtml("<a\tx=1> <a\nx=1\ny=2> <a\r\nx=1\r\ny=2>", true); //非空格分隔符
@@ -75,9 +74,9 @@ static void testfile(const char* fileName)
 			printf("can\'t open output file %s\n", (const char*)outFileName.getData());
 
 		htmlParser.parseHtml((const char*)memHtml.getData(), true); //htmlParser.parseHtml()
-		htmlParser.outputHtmlNodes(out);
+		htmlParser.dumpHtmlNodes(out);
 		fclose(out);
-		
+
 		memOutHtml.empty();
 		htmlParser.outputHtml(memOutHtml); //htmlParser.outputHtml()
 		outFileName.empty();
