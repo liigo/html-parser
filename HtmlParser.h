@@ -30,15 +30,15 @@ public:
 	size_t appendData(const void* pData, size_t nSize);
 	//取数据首地址(在数据长度为0时返回NULL)
 	//在appendXXX()或resetSize()或shrink()或exchange()或operator=调用之后可能会导致数据首地址发生改变
-	void* getData() const { return (m_nDataSize == 0 ? NULL : m_pBuffer); }
+	inline void* getData() const { return (m_nDataSize == 0 ? NULL : m_pBuffer); }
 	//取指定偏移处数据地址，偏移offset应小于getDataSize()，否则不保证返回的地址有效
-	void* getOffsetData(int offset) const { return (m_nDataSize == 0 ? NULL : ((unsigned char*)m_pBuffer + offset)); }
+	inline void* getOffsetData(int offset) const { return (m_nDataSize == 0 ? NULL : ((unsigned char*)m_pBuffer + offset)); }
 	//取数据长度
-	size_t getDataSize() const { return m_nDataSize; }
+	inline size_t getDataSize() const { return m_nDataSize; }
 	//重置数据长度，新长度可以为任意值，必要时会自动扩充缓存区
 	void resetDataSize(size_t size = 0);
 	//清空数据，等效于resetDataSize(0)
-	void empty() { resetDataSize(0); }
+	inline void empty() { resetDataSize(0); }
 	//收缩缓存区，避免长时间占用不再使用的内存，但缓存区中的已有数据仍然完整保留
 	void shrink();
 	//清理缓存区，释放内存
@@ -50,10 +50,10 @@ public:
 	void exchange(MemBuffer& other);
 
 	//添加基本类型数据
-	size_t appendInt(int i) { return appendData(&i, sizeof(i)); }
-	size_t appendChar(char c) { return appendData(&c, sizeof(c)); }
+	inline size_t appendInt(int i) { return appendData(&i, sizeof(i)); }
+	inline size_t appendChar(char c) { return appendData(&c, sizeof(c)); }
 	//把指针p本身的值（而非p指向的数据）添加到缓存区
-	size_t appendPointer(const void* p) { return appendData(&p, sizeof(p)); }
+	inline size_t appendPointer(const void* p) { return appendData(&p, sizeof(p)); }
 	//把文本内容添加到缓存区, len为写入的字节数（-1表示strlen(szText)），appendZeroChar表示是否额外添加'\0'
 	size_t appendText(const char* szText, size_t len = -1, bool appendZeroChar = false);
 
