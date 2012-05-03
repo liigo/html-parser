@@ -827,8 +827,11 @@ MemBuffer::~MemBuffer()
 
 const MemBuffer& MemBuffer::operator= (const MemBuffer& other)
 {
-	resetDataSize(0);
-	appendData(other.getData(), other.getDataSize());
+	if(&other != this)
+	{
+		resetDataSize(0);
+		appendData(other.getData(), other.getDataSize());
+	}
 	return *this;
 }
 

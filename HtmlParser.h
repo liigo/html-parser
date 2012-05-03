@@ -9,7 +9,6 @@
 // http://blog.csdn.net/liigo/article/details/6153829 (重要)
 // by liigo, @2010-2012
 
-
 namespace liigo
 {
 
@@ -22,7 +21,7 @@ public:
 	//nBufferSize为0时暂不分配缓存区内存，延迟到下一次写入数据时再分配
 	MemBuffer(size_t nBufferSize = -1);
 	MemBuffer(const MemBuffer& other); //从other对象复制数据，缓存区是自行分配的
-	~MemBuffer(); //析构时清理缓存区释放内存，除非已经detach()
+	virtual ~MemBuffer(); //析构时清理缓存区释放内存，除非已经detach()
 	const MemBuffer& operator= (const MemBuffer& other); //清空数据后再把other内的数据复制进来
 
 public:
@@ -141,7 +140,12 @@ class HtmlParser
 {
 public:
 	HtmlParser() {}
-	~HtmlParser() { freeHtmlNodes(); }
+	virtual ~HtmlParser() { freeHtmlNodes(); }
+
+private:
+	//disallow copy and assign: only declare, no implementation
+	HtmlParser(const HtmlParser&);
+	void operator=(const HtmlParser&);
 
 public:
 	//html
