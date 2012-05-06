@@ -35,7 +35,7 @@ public:
 	inline void* getOffsetData(int offset) const { return (m_nDataSize == 0 ? NULL : ((unsigned char*)m_pBuffer + offset)); }
 	//取数据长度
 	inline size_t getDataSize() const { return m_nDataSize; }
-	//重置数据长度，新长度可以为任意值，必要时会自动扩充缓存区
+	//重置数据长度，新长度可以为任意值，必要时会自动扩充缓存区，新增加的数据均为0字节值
 	void resetDataSize(size_t size = 0);
 	//清空数据，等效于resetDataSize(0)
 	inline void empty() { resetDataSize(0); }
@@ -43,9 +43,10 @@ public:
 	void shrink();
 	//清理缓存区，释放内存
 	void clean();
-	//放弃管理缓存区和其中的数据，用户应自行负责用free()释放数据:
-	//数据首地址为detach()前getData()返回的地址，数据长度为detach()前getDataSize()返回的长度
-	void detach();
+	//放弃管理缓存区和其中的数据，用户应自行负责用free()释放detach()后的数据:
+	//返回数据首地址，数据长度为detach()前getDataSize()返回的长度
+	//detach()时指定参数bShrink为true可有效避免浪费未经使用的缓存区内存
+	void* detach(bool bShrink = true);
 	//交换两个对象(this & other)各自管理的所有内容（包括数据和缓存区）
 	void exchange(MemBuffer& other);
 
@@ -56,6 +57,8 @@ public:
 	inline size_t appendPointer(const void* p) { return appendData(&p, sizeof(p)); }
 	//把文本内容添加到缓存区, len为写入的字节数（-1表示strlen(szText)），appendZeroChar表示是否额外添加'\0'
 	size_t appendText(const char* szText, size_t len = -1, bool appendZeroChar = false);
+	//把指定数量的0字节值添加到缓存区
+	size_t appendZeroBytes(int count);
 
 	//读取文件全部内容，如果keepExistData=true将保留缓存区原有数据，否则将清除原有数据
 	//参数appendZeroChar表示是否额外添加字符'\0'，参数pReadBytesr如果非NULL将写入从文件中读取的字节数

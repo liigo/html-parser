@@ -746,7 +746,7 @@ void HtmlParser::outputHtml(MemBuffer& buffer, bool keepBufferData)
 	for(int nodeIndex = 0, count = getHtmlNodeCount(); nodeIndex < count; nodeIndex++)
 	{
 		HtmlNode* pNode = getHtmlNode(nodeIndex);
-		outputHtmlNode(buffer, static_cast<const HtmlNode*>(pNode));
+		outputHtmlNode(buffer, pNode);
 	}
 }
 
@@ -853,13 +853,19 @@ void MemBuffer::clean()
 	m_nDataSize = m_nBufferSize = 0;
 }
 
-void MemBuffer::detach()
+void* MemBuffer::detach(bool bShrink)
 {
-	//数据长度为0时getData()返回NULL,用户没有机会释放内存,所以必须在内部释放m_pBuffer
-	if(m_nDataSize == 0 && m_pBuffer)
+	if(bShrink) shrink();
+	void* pReturn = m_pBuffer;
+	//数据长度为0时返回NULL,内部释放m_pBuffer
+	if(m_pBuffer && m_nDataSize == 0)
+	{
 		free(m_pBuffer);
+		pReturn = NULL;
+	}
 	m_pBuffer = NULL;
 	m_nDataSize = m_nBufferSize = 0;
+	return pReturn;
 }
 
 void* MemBuffer::require(size_t size)
@@ -964,6 +970,19 @@ size_t MemBuffer::appendText(const char* szText, size_t len, bool appendZeroChar
 	if(appendZeroChar)
 		appendChar('\0');
 	return offset;
+}
+
+size_t MemBuffer::appendZeroBytes(int count)
+{
+	if(count > 0)
+	{
+		resetDataSize(m_nDataSize + count);
+		return m_nDataSize - count;
+	}
+	else
+	{
+		return m_nDataSize;
+	}
 }
 
 bool MemBuffer::loadFromFile(const char* szFileName, bool keepExistData, bool appendZeroChar, size_t* pReadBytes)
