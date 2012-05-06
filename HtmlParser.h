@@ -182,7 +182,7 @@ protected:
 	virtual HtmlTagType onIdentifyHtmlTag(const char* szTagName, HtmlNodeType nodeType);
 	//允许子类覆盖, 以便更好的解析节点属性, 或者部分解析甚至干脆不解析节点属性(提高解析速度)
 	//可以根据标签名称(pNode->tagName)或标签类型(pNode->tagType)判断是否需要解析属性
-	//默认仅解析已识别出标签类型的开始标签的属性（即pNode->type == NODE_START_TAG && pNode->tagType != NODE_UNKNOWN）
+	//默认仅解析"已识别出标签类型"的标签属性（即pNode->tagType != NODE_UNKNOWN）
 	virtual void onParseAttributes(HtmlNode* pNode);
 	//允许子类覆盖, 在某节点解析完成后被调用, 如果返回false则立刻停止解析HTML
 	//这里也许是一个恰当的时机初始化pNode.pUser
