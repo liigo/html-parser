@@ -110,14 +110,20 @@ enum HtmlTagType
 
 enum HtmlNodeFlag
 {
+	//flags used in HtmlNode.flags
 	FLAG_SELF_CLOSING_TAG = 1 << 0, //自封闭标签: <br/>
 	FLAG_CDATA_BLOCK      = 1 << 1, //是CDATA区块
+	FLAG_NEED_FREE_TEXT   = 1 << 2, //需free(HtmlNode.text)
+	//flags used in HtmlAttribute.flags
+	FLAG_NEED_FREE_NAME   = 1 << 0, //需free(HtmlAttribute.name)
+	FLAG_NEED_FREE_VALUE  = 1 << 1, //需free(HtmlAttribute.value)
 };
 
 struct HtmlAttribute
 {
-	char* szName;
-	char* szValue;
+	char* name;
+	char* value;
+	size_t flags;
 };
 
 #define MAX_HTML_TAG_LENGTH  15 //节点名称的最大字符长度,超出将被截断
@@ -130,10 +136,9 @@ struct HtmlNode
 	char* text; //文本，视标签类型(tagType)不同意义也不同，可能为NULL
 				//如果type==NODE_START_TAG, text指向标签名称后面的属性文本
 				//如果type==NODE_CONTENT或NODE_REMARKS, text指向内容或注释文本
-	int attributeCount;        //属性个数（仅当属性被解析后有效，参见HtmlParser.parseAttributes()，下同）
-	HtmlAttribute* attributes;  //属性（名称=值），参见HtmlParser.getAttribute()
+	int attributeCount;    //属性个数（仅当属性被解析后有效，参见HtmlParser.parseAttributes()，下同）
+	MemBuffer* attributes; //属性（名称=值），参见HtmlParser.getAttribute()。将来可以动态添加属性。
 	size_t flags;    //bit OR of HtmlNodeFlag
-	char* pInternal; //reserved for internal usage
 	void* pUser;     //user customized, default to NULL
 };
 
@@ -157,6 +162,7 @@ public:
 	//nodes
 	size_t getHtmlNodeCount();
 	HtmlNode* getHtmlNode(size_t index); //must: 0 <= index < getHtmlNodeCount()
+	void freeHtmlNode(HtmlNode* pNode);  //只清理动态分配的内容，保留type,tagType,tagName,flags,pUser
 	void freeHtmlNodes();
 	//attributes
 	const HtmlAttribute* getAttribute(const HtmlNode* pNode, size_t index); //must: 0 <= index < pNode->attributeCount
@@ -167,7 +173,7 @@ public:
 	//output
 	void outputHtml(MemBuffer& buffer, bool keepBufferData = false);
 	void outputHtmlNode(MemBuffer& buffer, const HtmlNode* pNode);
-	void dumpHtmlNodes(FILE* f = stdout);
+	void dumpHtmlNodes(FILE* f = stdout); //for debug or test
 
 protected:
 	//允许子类覆盖, 以便识别更多标签(提高解析质量), 或者识别更少标签(提高解析速度)

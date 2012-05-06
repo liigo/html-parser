@@ -291,19 +291,20 @@ static void setNodeAttributeText(HtmlNode* pNode, const char* pStart)
 			pNode->flags |= FLAG_SELF_CLOSING_TAG; //自封闭标签
 		}
 		pNode->text = attributeText;
+		pNode->flags |= FLAG_NEED_FREE_TEXT; //标记需释放文本
 	}
 }
 
-static const char* s_LF = "\n"; //Unix,Linux
-static const char* s_CR = "\r"; //Mac
+static const char* s_LF   = "\n";   //Unix,Linux
+static const char* s_CR   = "\r";   //Mac
 static const char* s_CRLF = "\r\n"; //Windows
 
 // pNode != NULL, pStart != NULL, len > 0
-static void setContentNodeText(HtmlNode* pNode, const char* pStart, int len)
+static void setNodeText(HtmlNode* pNode, const char* pStart, int len)
 {
 	//由于空行文本比较常见，每个行首标签的前面都可能有一个空行文本
 	//此处优化直接返回常量文本，以减少不必要的内存分配
-	//freeHtmlNodes()里释放pNode->text时需做相应的处理
+	//因为没有设定FLAG_NEED_FREE_TEXT标记，freeHtmlNode(pNode)里不会释放这类常量文本
 	if(len == 1 && pStart[0] == '\n') { pNode->text = (char*)s_LF; return; }
 
 	if(pStart[0] == '\r')
@@ -311,7 +312,13 @@ static void setContentNodeText(HtmlNode* pNode, const char* pStart, int len)
 		if(len == 1) { pNode->text = (char*)s_CR; return; }
 		if(len == 2 && pStart[1] == '\n') { pNode->text = (char*)s_CRLF; return; }
 	}
-	pNode->text = duplicateStr(pStart, len);
+
+	char* text = duplicateStr(pStart, len); //TODO: 将来优化到尽量少复制文本
+	if(text)
+	{
+		pNode->text = text;
+		pNode->flags |= FLAG_NEED_FREE_TEXT; //标记需释放文本
+	}
 }
 
 void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
@@ -384,7 +391,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 				//Add Content Node
 				pNode = newHtmlNode();
 				pNode->type = NODE_CONTENT;
-				setContentNodeText(pNode, s, p - s);
+				setNodeText(pNode, s, p - s);
 				if(onNodeReady(pNode) == false) goto onuserend;
 			}
 
@@ -400,7 +407,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 						//Add Remarks Node
 						pNode = newHtmlNode();
 						pNode->type = NODE_REMARKS;
-						pNode->text = duplicateStr(p + 4, pEndRemarks - (p + 4));
+						setNodeText(pNode, p + 4, pEndRemarks - (p + 4));
 						if(onNodeReady(pNode) == false) goto onuserend;
 						s = p = (char*)pEndRemarks + 3;
 						bInsideTag = bInQuote1 = bInQuote2 = false;
@@ -417,8 +424,8 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 						//Add Content Node with CDATA flag
 						pNode = newHtmlNode();
 						pNode->type = NODE_CONTENT;
-						pNode->text = duplicateStr(p + 9, pEndCData - (p + 9));
-						pNode->flags |= FLAG_CDATA_BLOCK; //CDATA标记, used by outputHtml()
+						setNodeText(pNode, p + 9, pEndCData - (p + 9));
+						pNode->flags |= FLAG_CDATA_BLOCK; //标记CDATA, used by outputHtml() and dumpHtml()
 						if(onNodeReady(pNode) == false) goto onuserend;
 						s = p = (char*)pEndCData + 3;
 						bInsideTag = bInQuote1 = bInQuote2 = false;
@@ -449,7 +456,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 				{
 					//处理自封闭的标签, 如<br/>, 删除tagName中可能会有的'/'字符
 					//自封闭的结点的type设置为NODE_START_TAG应该可以接受(否则要引入新的节点类型NODE_STARTCLOSE_TAG)
-					pNode->flags |= FLAG_SELF_CLOSING_TAG; //used by outputHtml()
+					pNode->flags |= FLAG_SELF_CLOSING_TAG; //used by outputHtml() and dumpHtml()
 					pNode->tagName[tagNameLen-1] = '\0';
 					tagNameLen--;
 				}
@@ -471,13 +478,13 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 					//parse error, tag name is too long, MAX_HTML_TAG_LENGTH is too small
 				}
 
-				//识别节点类型(HtmlTagType) - 内部
+				//识别节点类型(HtmlTagType) - 内部处理
 				pNode->tagType = identifyHtmlTag_Internal(pNode->tagName); //内部识别SCRIPT,STYLE
 				if(pNode->tagType == TAG_STYLE)
 					bInStyle = (pNode->type == NODE_START_TAG);
 				if(pNode->tagType == TAG_SCRIPT)
 					bInScript = (pNode->type == NODE_START_TAG);
-				//识别节点类型(HtmlTagType) - 用户
+				//识别节点类型(HtmlTagType) - 用户处理
 				if(pNode->tagType == TAG_UNKNOWN)
 					pNode->tagType = onIdentifyHtmlTag(pNode->tagName, pNode->type);
 
@@ -500,7 +507,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 		//Add Content Node
 		pNode = newHtmlNode();
 		pNode->type = NODE_CONTENT;
-		setContentNodeText(pNode, s, strlen(s));
+		setNodeText(pNode, s, strlen(s));
 		if(onNodeReady(pNode) == false) goto onuserend;
 	}
 
@@ -510,7 +517,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 onerror:
 	pNode = newHtmlNode();
 	pNode->type = NODE_CONTENT;
-	pNode->text = duplicateStr(s, -1);
+	setNodeText(pNode, s, strlen(s));
 	goto dumpnodes;
 	return;
 
@@ -539,26 +546,34 @@ void HtmlParser::freeHtmlNodes()
 	for(int i = 0, count = getHtmlNodeCount(); i < count; i++)
 	{
 		HtmlNode* pNode = getHtmlNode(i);
-		if(pNode->text)
-		{
-			if(pNode->type != NODE_CONTENT)
-				freeDuplicatedStr(pNode->text);
-			else if(pNode->text != s_CRLF && pNode->text != s_LF && pNode->text != s_CR) //see setContentNodeText()
-				freeDuplicatedStr(pNode->text);
-		}
-
-		if(pNode->attributes)
-		{
-			for(int attributeIndex = 0; attributeIndex < pNode->attributeCount; attributeIndex++)
-			{
-				HtmlAttribute* attribute = pNode->attributes + attributeIndex;
-				if(attribute->szName)  freeDuplicatedStr(attribute->szName);
-				if(attribute->szValue) freeDuplicatedStr(attribute->szValue);
-			}
-			free(pNode->attributes); //see: HtmlParser.parseAttributes(), MemBuffer.detach()
-		}
+		freeHtmlNode(pNode);
 	}
 	m_HtmlNodes.clean();
+}
+
+void HtmlParser::freeHtmlNode(HtmlNode* pNode)
+{
+	if(pNode == NULL) return;
+
+	if(pNode->text && (pNode->flags & FLAG_NEED_FREE_TEXT))
+	{
+		freeDuplicatedStr(pNode->text);
+	}
+	pNode->text = NULL;
+
+	if(pNode->attributes)
+	{
+		for(int attributeIndex = 0; attributeIndex < pNode->attributeCount; attributeIndex++)
+		{
+			const HtmlAttribute* pAttribute = getAttribute(pNode, attributeIndex);
+			if(pAttribute->name && (pAttribute->flags & FLAG_NEED_FREE_NAME))
+				freeDuplicatedStr(pAttribute->name);
+			if(pAttribute->value && (pAttribute->flags & FLAG_NEED_FREE_VALUE))
+				freeDuplicatedStr(pAttribute->value);
+		}
+		delete(pNode->attributes); //see: HtmlParser.parseAttributes()
+	}
+	pNode->attributeCount = 0;
 }
 
 //[virtual]
@@ -629,27 +644,31 @@ void HtmlParser::parseAttributes(HtmlNode* pNode)
 
 	char** pp = (char**) mem.getData();
 
-	MemBuffer attributes;
+	MemBuffer* attributes = new MemBuffer();
 	for(int i = 0, n = mem.getDataSize() / sizeof(char*) - 2; i < n; i++)
 	{
-		attributes.appendPointer(pp[i]); //attribute name
+		attributes->appendPointer(pp[i]); //attribute name
 		if(pp[i+1] == NULL)
 		{
-			attributes.appendPointer(pp[i+2]); //attribute value
+			attributes->appendPointer(pp[i+2]); //attribute value
 			i += 2;
 		}
 		else
-			attributes.appendPointer(NULL); //attribute vlalue
+			attributes->appendPointer(NULL); //attribute vlalue
+
+		//标记需free属性名称和属性值文本
+		//TODO: 将来优化到尽量少复制文本
+		attributes->appendInt(FLAG_NEED_FREE_NAME | FLAG_NEED_FREE_VALUE); //attribute flags
 	}
 
-	pNode->attributeCount = attributes.getDataSize() / sizeof(char*) / 2;
-	pNode->attributes = (HtmlAttribute*) attributes.getData();
-	attributes.detach();
+	attributes->shrink();
+	pNode->attributeCount = attributes->getDataSize() / sizeof(HtmlAttribute);
+	pNode->attributes = attributes;
 }
 
 const HtmlAttribute* HtmlParser::getAttribute(const HtmlNode* pNode, size_t index)
 {
-	return pNode->attributes + index;
+	return ((HtmlAttribute*) pNode->attributes->getData()) + index;
 }
 
 const HtmlAttribute* HtmlParser::getAttribute(const HtmlNode* pNode, const char* szAttributeName)
@@ -659,8 +678,8 @@ const HtmlAttribute* HtmlParser::getAttribute(const HtmlNode* pNode, const char*
 
 	for(int i = 0; i < pNode->attributeCount; i++)
 	{
-		HtmlAttribute* attribute = pNode->attributes + i;
-		if(stricmp(attribute->szName, szAttributeName) == 0)
+		const HtmlAttribute* attribute = getAttribute(pNode, i);
+		if(stricmp(attribute->name, szAttributeName) == 0)
 			return attribute;
 	}
 	return NULL;
@@ -670,7 +689,7 @@ const char* HtmlParser::getAttributeStringValue(const HtmlNode* pNode, const cha
 {
 	const HtmlAttribute* pAttribute = getAttribute(pNode, szAttributeName);
 	if(pAttribute)
-		return pAttribute->szValue;
+		return pAttribute->value;
 	else
 		return szDefaultValue;
 }
@@ -678,8 +697,8 @@ const char* HtmlParser::getAttributeStringValue(const HtmlNode* pNode, const cha
 int HtmlParser::getAttributeIntValue(const HtmlNode* pNode, const char* szAttributeName, int defaultValue /*= 0*/)
 {
 	const HtmlAttribute* pAttribute = getAttribute(pNode, szAttributeName);
-	if(pAttribute && pAttribute->szValue)
-		return atoi(pAttribute->szValue);
+	if(pAttribute && pAttribute->value)
+		return atoi(pAttribute->value);
 	else
 		return defaultValue;
 }
@@ -724,11 +743,11 @@ void HtmlParser::dumpHtmlNodes(FILE* f)
 			fprintf(f, "    attributes: ");
 			for(int i = 0; i < pNode->attributeCount; i++)
 			{
-				HtmlAttribute* attribute = pNode->attributes + i;
-				if(attribute->szValue)
-					fprintf(f, "%s = \"%s\"", attribute->szName, attribute->szValue);
+				const HtmlAttribute* pAttribute = getAttribute(pNode, i);
+				if(pAttribute->value)
+					fprintf(f, "%s = \"%s\"", pAttribute->name, pAttribute->value);
 				else
-					fprintf(f, "%s", attribute->szName);
+					fprintf(f, "%s", pAttribute->name);
 				if(i < pNode->attributeCount - 1)
 				{
 					fprintf(f, ", ");
@@ -777,13 +796,13 @@ void HtmlParser::outputHtmlNode(MemBuffer& buffer, const HtmlNode* pNode)
 		for(attributeIndex = 0; attributeIndex < pNode->attributeCount; attributeIndex++)
 		{
 			const HtmlAttribute* pAttribute = getAttribute(pNode, attributeIndex);
-			buffer.appendText(pAttribute->szName);
-			if(pAttribute->szValue)
+			buffer.appendText(pAttribute->name);
+			if(pAttribute->value)
 			{
-				bool hasQuoteChar = (strchr(pAttribute->szValue, '\"') != NULL);
+				bool hasQuoteChar = (strchr(pAttribute->value, '\"') != NULL);
 				buffer.appendChar('=');
 				buffer.appendChar(hasQuoteChar ? '\'' : '\"');
-				buffer.appendText(pAttribute->szValue);
+				buffer.appendText(pAttribute->value);
 				buffer.appendChar(hasQuoteChar ? '\'' : '\"');
 			}
 			if(attributeIndex < pNode->attributeCount - 1)
