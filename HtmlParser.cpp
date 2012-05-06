@@ -576,6 +576,42 @@ void HtmlParser::freeHtmlNode(HtmlNode* pNode)
 	pNode->attributeCount = 0;
 }
 
+static HtmlNode* cloneHtmlNode(const HtmlNode* pNode)
+{
+	HtmlNode* pNewNode = (HtmlNode*) malloc(sizeof(HtmlNode));
+	if(pNewNode == NULL)
+		return NULL;
+
+	memcpy(pNewNode, pNode, sizeof(HtmlNode)); //Ç³¿½±´
+
+	if(pNode->text)
+	{
+		pNewNode->text = duplicateStr(pNode->text, -1);
+		pNewNode->flags |= FLAG_NEED_FREE_TEXT;
+	}
+
+	if(pNode->attributes)
+	{
+		pNewNode->attributes = new MemBuffer(*pNode->attributes);
+		HtmlAttribute* pAttributes = (HtmlAttribute*) pNewNode->attributes->getData();
+		for(int i = 0; i < pNode->attributeCount; ++i)
+		{
+			HtmlAttribute* pAttribute = pAttributes + i;
+			if(pAttribute->name)
+			{
+				pAttribute->name = duplicateStr(pAttribute->name, -1);
+				pAttribute->flags |= FLAG_NEED_FREE_NAME;
+			}
+			if(pAttribute->value)
+			{
+				pAttribute->value = duplicateStr(pAttribute->value, -1);
+				pAttribute->flags |= FLAG_NEED_FREE_VALUE;
+			}
+		}
+	}
+	return pNewNode;
+}
+
 //[virtual]
 void HtmlParser::onParseAttributes(HtmlNode* pNode)
 {

@@ -162,14 +162,15 @@ public:
 	//nodes
 	size_t getHtmlNodeCount();
 	HtmlNode* getHtmlNode(size_t index); //must: 0 <= index < getHtmlNodeCount()
-	void freeHtmlNode(HtmlNode* pNode);  //只清理动态分配的内容，保留type,tagType,tagName,flags,pUser
+	static HtmlNode* cloneHtmlNode(const HtmlNode* pNode); //需使用freeHtmlNode()释放
+	static void freeHtmlNode(HtmlNode* pNode); //只清理动态分配的内容，保留type,tagType,tagName,flags,pUser
 	void freeHtmlNodes();
 	//attributes
-	const HtmlAttribute* getAttribute(const HtmlNode* pNode, size_t index); //must: 0 <= index < pNode->attributeCount
-	const HtmlAttribute* getAttribute(const HtmlNode* pNode, const char* szAttributeName); //return NULL if attribute not exist
-	const char* getAttributeStringValue(const HtmlNode* pNode, const char* szAttributeName, const char* szDefaultValue = NULL);
-	int getAttributeIntValue(const HtmlNode* pNode, const char* szAttributeName, int defaultValue = 0);
-	void parseAttributes(HtmlNode* pNode); //解析节点属性
+	static const HtmlAttribute* getAttribute(const HtmlNode* pNode, size_t index); //must: 0 <= index < pNode->attributeCount
+	static const HtmlAttribute* getAttribute(const HtmlNode* pNode, const char* szAttributeName); //return NULL if attribute not exist
+	static const char* getAttributeStringValue(const HtmlNode* pNode, const char* szAttributeName, const char* szDefaultValue = NULL);
+	static int getAttributeIntValue(const HtmlNode* pNode, const char* szAttributeName, int defaultValue = 0);
+	static void parseAttributes(HtmlNode* pNode); //解析节点属性
 	//output
 	void outputHtml(MemBuffer& buffer, bool keepBufferData = false);
 	void outputHtmlNode(MemBuffer& buffer, const HtmlNode* pNode);
