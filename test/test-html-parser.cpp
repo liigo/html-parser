@@ -12,6 +12,7 @@ class ParseAll : public HtmlParser
 
 static void testfile(const char* fileName);
 static void testoutput(const char* szHtml);
+static void enumnodes();
 
 void main()
 {
@@ -44,6 +45,8 @@ void main()
 	htmlParser.parseHtml("<a href=\"http://www.163.com\"/>"); //确认解析后是自封闭标签
 	htmlParser.parseHtml("<a\tx=1> <a\nx=1\ny=2> <a\r\nx=1\r\ny=2>", true); //非空格分隔符
 	htmlParser.parseHtml("<a x=\"abc\"y=''z>", true); //属性值引号后面没有空白分隔符，并不鲜见
+
+	enumnodes(); //展示遍历节点的方法
 
 	//测试解析各大门户网站
 	testfile("testfiles\\sina.com.cn.html");
@@ -98,4 +101,36 @@ static void testoutput(const char* szHtml)
 	htmlParser.parseHtml(szHtml, true);
 	htmlParser.outputHtml(mem); mem.appendChar('\0');
 	printf("%s\n", (char*)mem.getData());
+}
+
+static void enumnodes()
+{
+	HtmlParser htmlParser;
+	htmlParser.parseHtml("<html><p>...</p>");
+
+	//第一种遍历节点的方法: for循环
+	for(int index = 0, count = htmlParser.getHtmlNodeCount(); index < count; index++)
+	{
+		HtmlNode* pNode = htmlParser.getHtmlNode(index);
+		htmlParser.dumpHtmlNode(pNode);
+	}
+
+	//第二种遍历节点的方法: while循环
+	//由于最后必然有一个额外添加的NODE_UNKNOWN节点，所以此法可行
+	HtmlNode* pNode = htmlParser.getHtmlNode(0);
+	while(pNode->type != NODE_UNKNOWN)
+	{
+		htmlParser.dumpHtmlNode(pNode);
+		pNode++;
+	}
+
+	//即使在没有正常节点的情况下，while循环遍历方法也是可行的
+	htmlParser.parseHtml(NULL);
+	pNode = htmlParser.getHtmlNode(0);
+	while(pNode->type != NODE_UNKNOWN)
+	{
+		htmlParser.dumpHtmlNode(pNode);
+		pNode++;
+	}
+
 }

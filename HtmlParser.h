@@ -83,7 +83,7 @@ enum HtmlNodeType
 	NODE_UNKNOWN = 0,
 	NODE_START_TAG, //开始标签，如 <a href="liigo.com"> 或 <br/>
 	NODE_END_TAG,   //结束标签，如 </a>
-	NODE_CONTENT,   //内容: 介于开始标签或结束标签之间的普通文本
+	NODE_CONTENT,   //内容: 介于开始标签和/或结束标签之间的普通文本
 	NODE_REMARKS,   //注释: <!-- -->
 };
 
@@ -111,9 +111,10 @@ enum HtmlTagType
 enum HtmlNodeFlag
 {
 	//flags used in HtmlNode.flags
-	FLAG_SELF_CLOSING_TAG = 1 << 0, //自封闭标签: <br/>
+	FLAG_SELF_CLOSING_TAG = 1 << 0, //是自封闭标签: <br/>
 	FLAG_CDATA_BLOCK      = 1 << 1, //是CDATA区块
 	FLAG_NEED_FREE_TEXT   = 1 << 2, //需free(HtmlNode.text)
+
 	//flags used in HtmlAttribute.flags
 	FLAG_NEED_FREE_NAME   = 1 << 0, //需free(HtmlAttribute.name)
 	FLAG_NEED_FREE_VALUE  = 1 << 1, //需free(HtmlAttribute.value)
@@ -156,15 +157,20 @@ private:
 	void operator=(const HtmlParser&);
 
 public:
-	//html
-	void parseHtml(const char* szHtml, bool parseProps = false);
+	//解析HTML，解析结果是一系列HtmlNode节点
+	//最后必然会额外添加一个NODE_UNKNOWN节点(HtmlNode.type==NODE_UNKNOWN)作为所有节点的终结标记
+	void parseHtml(const char* szHtml, bool parseAttributes = false);
 
-	//nodes
-	size_t getHtmlNodeCount();
-	HtmlNode* getHtmlNode(size_t index); //must: 0 <= index < getHtmlNodeCount()
+	//取节点个数（不包括额外添加的NODE_UNKNOWN节点）
+	int getHtmlNodeCount();
+	//取指定索引处的节点，索引必须合法: 0 <= index <= getHtmlNodeCount()
+	//其中最后一个节点（即index==getHtmlNodeCount()处）为额外添加的NODE_UNKNOWN节点
+	HtmlNode* getHtmlNode(int index);
+
 	static HtmlNode* cloneHtmlNode(const HtmlNode* pNode); //需使用freeHtmlNode()释放
 	static void freeHtmlNode(HtmlNode* pNode); //只清理动态分配的内容，保留type,tagType,tagName,flags,pUser
 	void freeHtmlNodes();
+
 	//attributes
 	static const HtmlAttribute* getAttribute(const HtmlNode* pNode, size_t index); //must: 0 <= index < pNode->attributeCount
 	static const HtmlAttribute* getAttribute(const HtmlNode* pNode, const char* szAttributeName); //return NULL if attribute not exist
@@ -175,10 +181,12 @@ public:
 	void outputHtml(MemBuffer& buffer, bool keepBufferData = false);
 	void outputHtmlNode(MemBuffer& buffer, const HtmlNode* pNode);
 	void dumpHtmlNodes(FILE* f = stdout); //for debug or test
+	void dumpHtmlNode(const HtmlNode* pNode, int nodeIndex = -1, FILE* f = stdout);
 
 protected:
 	//允许子类覆盖, 以便识别更多标签(提高解析质量), 或者识别更少标签(提高解析速度)
 	//默认仅识别涉及HTML基本结构和信息的有限几个开始标签: A,IMG,META,BODY,TITLE,FRAME,IFRAME
+	//onIdentifyHtmlTag()先于onParseAttributes()被调用
 	virtual HtmlTagType onIdentifyHtmlTag(const char* szTagName, HtmlNodeType nodeType);
 	//允许子类覆盖, 以便更好的解析节点属性, 或者部分解析甚至干脆不解析节点属性(提高解析速度)
 	//可以根据标签名称(pNode->tagName)或标签类型(pNode->tagType)判断是否需要解析属性
@@ -189,7 +197,7 @@ protected:
 	virtual bool onNodeReady(HtmlNode* pNode) { return true; }
 
 private:
-	HtmlNode* newHtmlNode();
+	HtmlNode* appendHtmlNode();
 
 private:
 	MemBuffer m_HtmlNodes;

@@ -2,6 +2,7 @@
 #include <memory.h>
 #include <string.h>
 #include <ctype.h>
+#include <assert.h>
 
 //HtmlParser类，用于解析HTML文本
 //by liigo, @2010-2012
@@ -262,7 +263,7 @@ HtmlTagType HtmlParser::onIdentifyHtmlTag(const char* szTagName, HtmlNodeType no
 	return identifyHtmlTagInTable(szTagName, n2tTable, sizeof(n2tTable)/sizeof(n2tTable[0]));
 }
 
-HtmlNode* HtmlParser::newHtmlNode()
+HtmlNode* HtmlParser::appendHtmlNode()
 {
 	static char staticHtmlNodeTemplate[sizeof(HtmlNode)] = {0};
 	size_t offset = m_HtmlNodes.appendData(staticHtmlNodeTemplate, sizeof(HtmlNode));
@@ -324,7 +325,12 @@ static void setNodeText(HtmlNode* pNode, const char* pStart, int len)
 void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 {
 	freeHtmlNodes();
-	if(szHtml == NULL || *szHtml == '\0') return;
+	if(szHtml == NULL || *szHtml == '\0')
+	{
+		HtmlNode* pNode = appendHtmlNode();
+		pNode->type = NODE_UNKNOWN;
+		return; //额外添加一个NODE_UNKNOWN节点
+	}
 
 	char* p = (char*) szHtml;
 	char* s = (char*) szHtml;
@@ -389,7 +395,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 			if(p > s)
 			{
 				//Add Content Node
-				pNode = newHtmlNode();
+				pNode = appendHtmlNode();
 				pNode->type = NODE_CONTENT;
 				setNodeText(pNode, s, p - s);
 				if(onNodeReady(pNode) == false) goto onuserend;
@@ -405,7 +411,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 					if(pEndRemarks)
 					{
 						//Add Remarks Node
-						pNode = newHtmlNode();
+						pNode = appendHtmlNode();
 						pNode->type = NODE_REMARKS;
 						setNodeText(pNode, p + 4, pEndRemarks - (p + 4));
 						if(onNodeReady(pNode) == false) goto onuserend;
@@ -422,7 +428,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 					if(pEndCData)
 					{
 						//Add Content Node with CDATA flag
-						pNode = newHtmlNode();
+						pNode = appendHtmlNode();
 						pNode->type = NODE_CONTENT;
 						setNodeText(pNode, p + 9, pEndCData - (p + 9));
 						pNode->flags |= FLAG_CDATA_BLOCK; //标记CDATA, used by outputHtml() and dumpHtml()
@@ -444,7 +450,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 			if(p > s)
 			{
 				//创建新节点(HtmlNode)，得到节点类型(NodeType)和名称(TagName)
-				pNode = newHtmlNode();
+				pNode = appendHtmlNode();
 				while(isspace(*s)) s++;
 				pNode->type = (*s == '/' ? NODE_END_TAG : NODE_START_TAG);
 				if(*s == '/') s++;
@@ -505,39 +511,45 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 	if(p > s)
 	{
 		//Add Content Node
-		pNode = newHtmlNode();
+		pNode = appendHtmlNode();
 		pNode->type = NODE_CONTENT;
 		setNodeText(pNode, s, strlen(s));
 		if(onNodeReady(pNode) == false) goto onuserend;
 	}
 
-	goto dumpnodes;
+	goto endnodes;
 	return;
 
 onerror:
-	pNode = newHtmlNode();
+	pNode = appendHtmlNode();
 	pNode->type = NODE_CONTENT;
 	setNodeText(pNode, s, strlen(s));
-	goto dumpnodes;
+	goto endnodes;
 	return;
 
 onuserend:
-	goto dumpnodes;
+	goto endnodes;
 	return;
 
-dumpnodes:
+endnodes:
+	//确保在所有节点最后额外添加一个NODE_UNKNOWN节点
+	pNode = appendHtmlNode();
+	pNode->type = NODE_UNKNOWN;
+
 #ifdef _DEBUG
 	dumpHtmlNodes(); //just for test
 #endif
 }
 
-size_t HtmlParser::getHtmlNodeCount()
+int HtmlParser::getHtmlNodeCount()
 {
-	return (size_t)(m_HtmlNodes.getDataSize() / sizeof(HtmlNode));
+	//忽略最后一个额外添加的NODE_UNKNOWN节点，参见parseHtml()
+	return (int)(m_HtmlNodes.getDataSize() / sizeof(HtmlNode)) - 1;
 }
 
-HtmlNode* HtmlParser::getHtmlNode(size_t index)
+HtmlNode* HtmlParser::getHtmlNode(int index)
 {
+	assert(index >= 0 && index <= getHtmlNodeCount());
 	return (HtmlNode*)m_HtmlNodes.getData() + index;
 }
 
@@ -741,58 +753,65 @@ int HtmlParser::getAttributeIntValue(const HtmlNode* pNode, const char* szAttrib
 
 void HtmlParser::dumpHtmlNodes(FILE* f)
 {
-	char buffer[256] = {0};
 	fprintf(f, "\r\n-------- begin HtmlParser.dumpHtmlNodes() --------\r\n");
 	for(int i = 0, count = getHtmlNodeCount(); i < count; i++)
 	{
 		HtmlNode* pNode = getHtmlNode(i);
-		switch(pNode->type)
-		{
-		case NODE_CONTENT:
-			sprintf(buffer, "%2d) type: NODE_CONTENT", i);
-			break;
-		case NODE_START_TAG:
-			sprintf(buffer, "%2d) type: NODE_START_TAG, tagName: %s (%d)", i, pNode->tagName, pNode->tagType);
-			break;
-		case NODE_END_TAG:
-			sprintf(buffer, "%2d) type: NODE_END_TAG, tagName: %s (%d)", i, pNode->tagName, pNode->tagType);
-			break;
-		case NODE_REMARKS:
-			sprintf(buffer, "%2d) type: NODE_REMARKS", i);
-			break;
-		case NODE_UNKNOWN:
-		default:
-			sprintf(buffer, "%2d) type: NODE_UNKNOWN", i);
-			break;
-		}
-		fprintf(f, "%s", buffer);
-		if(pNode->text)
-			fprintf(f, ", text: %s", pNode->text);
-		if(pNode->flags & FLAG_SELF_CLOSING_TAG)
-			fprintf(f, ", flags: />"); //自封闭
-		if(pNode->flags & FLAG_CDATA_BLOCK)
-			fprintf(f, ", flags: CDATA"); //CDATA
-		fprintf(f, "\r\n");
-
-		if(pNode->attributeCount > 0)
-		{
-			fprintf(f, "    attributes: ");
-			for(int i = 0; i < pNode->attributeCount; i++)
-			{
-				const HtmlAttribute* pAttribute = getAttribute(pNode, i);
-				if(pAttribute->value)
-					fprintf(f, "%s = \"%s\"", pAttribute->name, pAttribute->value);
-				else
-					fprintf(f, "%s", pAttribute->name);
-				if(i < pNode->attributeCount - 1)
-				{
-					fprintf(f, ", ");
-				}
-			}
-			fprintf(f, "\r\n");
-		}
+		dumpHtmlNode(pNode, i, f);
 	}
 	fprintf(f, "-------- end of HtmlParser.dumpHtmlNodes() --------\r\n");
+}
+
+void HtmlParser::dumpHtmlNode(const HtmlNode* pNode, int nodeIndex, FILE* f)
+{
+	assert(pNode);
+	char buffer[256] = {0};
+
+	switch(pNode->type)
+	{
+	case NODE_CONTENT:
+		sprintf(buffer, "%2d) type: NODE_CONTENT", nodeIndex);
+		break;
+	case NODE_START_TAG:
+		sprintf(buffer, "%2d) type: NODE_START_TAG, tagName: %s (%d)", nodeIndex, pNode->tagName, pNode->tagType);
+		break;
+	case NODE_END_TAG:
+		sprintf(buffer, "%2d) type: NODE_END_TAG, tagName: %s (%d)", nodeIndex, pNode->tagName, pNode->tagType);
+		break;
+	case NODE_REMARKS:
+		sprintf(buffer, "%2d) type: NODE_REMARKS", nodeIndex);
+		break;
+	case NODE_UNKNOWN:
+	default:
+		sprintf(buffer, "%2d) type: NODE_UNKNOWN", nodeIndex);
+		break;
+	}
+	fprintf(f, "%s", buffer);
+	if(pNode->text)
+		fprintf(f, ", text: %s", pNode->text);
+	if(pNode->flags & FLAG_SELF_CLOSING_TAG)
+		fprintf(f, ", flags: />"); //自封闭
+	if(pNode->flags & FLAG_CDATA_BLOCK)
+		fprintf(f, ", flags: CDATA"); //CDATA
+	fprintf(f, "\r\n");
+
+	if(pNode->attributeCount > 0)
+	{
+		fprintf(f, "    attributes: ");
+		for(int i = 0; i < pNode->attributeCount; i++)
+		{
+			const HtmlAttribute* pAttribute = getAttribute(pNode, i);
+			if(pAttribute->value)
+				fprintf(f, "%s = \"%s\"", pAttribute->name, pAttribute->value);
+			else
+				fprintf(f, "%s", pAttribute->name);
+			if(i < pNode->attributeCount - 1)
+			{
+				fprintf(f, ", ");
+			}
+		}
+		fprintf(f, "\r\n");
+	}
 }
 
 void HtmlParser::outputHtml(MemBuffer& buffer, bool keepBufferData)
