@@ -324,7 +324,7 @@ static void setNodeText(HtmlNode* pNode, const char* pStart, int len)
 
 void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 {
-	freeHtmlNodes();
+	cleanHtmlNodes();
 	if(szHtml == NULL || *szHtml == '\0')
 	{
 		HtmlNode* pNode = appendHtmlNode();
@@ -553,17 +553,17 @@ HtmlNode* HtmlParser::getHtmlNode(int index)
 	return (HtmlNode*)m_HtmlNodes.getData() + index;
 }
 
-void HtmlParser::freeHtmlNodes()
+void HtmlParser::cleanHtmlNodes()
 {
 	for(int i = 0, count = getHtmlNodeCount(); i < count; i++)
 	{
 		HtmlNode* pNode = getHtmlNode(i);
-		freeHtmlNode(pNode);
+		cleanHtmlNode(pNode);
 	}
 	m_HtmlNodes.clean();
 }
 
-void HtmlParser::freeHtmlNode(HtmlNode* pNode)
+void HtmlParser::cleanHtmlNode(HtmlNode* pNode)
 {
 	if(pNode == NULL) return;
 
@@ -577,36 +577,39 @@ void HtmlParser::freeHtmlNode(HtmlNode* pNode)
 	{
 		for(int attributeIndex = 0; attributeIndex < pNode->attributeCount; attributeIndex++)
 		{
-			const HtmlAttribute* pAttribute = getAttribute(pNode, attributeIndex);
+			HtmlAttribute* pAttribute = (HtmlAttribute*) getAttribute(pNode, attributeIndex);
 			if(pAttribute->name && (pAttribute->flags & FLAG_NEED_FREE_NAME))
 				freeDuplicatedStr(pAttribute->name);
 			if(pAttribute->value && (pAttribute->flags & FLAG_NEED_FREE_VALUE))
 				freeDuplicatedStr(pAttribute->value);
+			pAttribute->name = NULL;
+			pAttribute->value = NULL;
+			pAttribute->flags = 0;
 		}
 		delete(pNode->attributes); //see: HtmlParser.parseAttributes()
+		pNode->attributes = NULL;
 	}
 	pNode->attributeCount = 0;
 }
 
-static HtmlNode* cloneHtmlNode(const HtmlNode* pNode)
+bool HtmlParser::cloneHtmlNode(const HtmlNode* pSrcNode, HtmlNode* pDestNode)
 {
-	HtmlNode* pNewNode = (HtmlNode*) malloc(sizeof(HtmlNode));
-	if(pNewNode == NULL)
-		return NULL;
+	if(pDestNode == NULL)
+		return false;
 
-	memcpy(pNewNode, pNode, sizeof(HtmlNode)); //Ç³¿½±´
+	memcpy(pDestNode, pSrcNode, sizeof(HtmlNode)); //ÏÈÇ³¿½±´£¬ºóÃæÊÇÉî¿½±´
 
-	if(pNode->text)
+	if(pSrcNode->text)
 	{
-		pNewNode->text = duplicateStr(pNode->text, -1);
-		pNewNode->flags |= FLAG_NEED_FREE_TEXT;
+		pDestNode->text = duplicateStr(pSrcNode->text, -1);
+		pDestNode->flags |= FLAG_NEED_FREE_TEXT;
 	}
 
-	if(pNode->attributes)
+	if(pSrcNode->attributes)
 	{
-		pNewNode->attributes = new MemBuffer(*pNode->attributes);
-		HtmlAttribute* pAttributes = (HtmlAttribute*) pNewNode->attributes->getData();
-		for(int i = 0; i < pNode->attributeCount; ++i)
+		pDestNode->attributes = new MemBuffer(*pSrcNode->attributes);
+		HtmlAttribute* pAttributes = (HtmlAttribute*) pDestNode->attributes->getData();
+		for(int i = 0; i < pSrcNode->attributeCount; ++i)
 		{
 			HtmlAttribute* pAttribute = pAttributes + i;
 			if(pAttribute->name)
@@ -621,7 +624,7 @@ static HtmlNode* cloneHtmlNode(const HtmlNode* pNode)
 			}
 		}
 	}
-	return pNewNode;
+	return true;
 }
 
 //[virtual]

@@ -149,7 +149,7 @@ class HtmlParser
 {
 public:
 	HtmlParser() {}
-	virtual ~HtmlParser() { freeHtmlNodes(); }
+	virtual ~HtmlParser() { cleanHtmlNodes(); }
 
 private:
 	//disallow copy and assign: only declare, no implementation
@@ -167,9 +167,9 @@ public:
 	//其中最后一个节点（即index==getHtmlNodeCount()处）为额外添加的NODE_UNKNOWN节点
 	HtmlNode* getHtmlNode(int index);
 
-	static HtmlNode* cloneHtmlNode(const HtmlNode* pNode); //需使用freeHtmlNode()释放
-	static void freeHtmlNode(HtmlNode* pNode); //只清理动态分配的内容，保留type,tagType,tagName,flags,pUser
-	void freeHtmlNodes();
+	static bool cloneHtmlNode(const HtmlNode* pSrcNode, HtmlNode* pDestNode); //需使用cleanHtmlNode()清理
+	static void cleanHtmlNode(HtmlNode* pNode); //只清理节点中动态分配的内容，保留type,tagType,tagName,flags,pUser
+	void cleanHtmlNodes(); //清理所有节点并释放所占用内存
 
 	//attributes
 	static const HtmlAttribute* getAttribute(const HtmlNode* pNode, size_t index); //must: 0 <= index < pNode->attributeCount
