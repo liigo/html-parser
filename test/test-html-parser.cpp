@@ -116,9 +116,9 @@ static void enumnodes()
 	}
 
 	//第二种遍历节点的方法: while循环
-	//由于最后必然有一个额外添加的NODE_UNKNOWN节点，所以此法可行
+	//由于最后必然有一个额外添加的NODE_NULL节点，所以此法可行
 	HtmlNode* pNode = htmlParser.getHtmlNode(0);
-	while(pNode->type != NODE_UNKNOWN)
+	while(pNode->type != NODE_NULL)
 	{
 		htmlParser.dumpHtmlNode(pNode);
 		pNode++;
@@ -127,7 +127,7 @@ static void enumnodes()
 	//即使在没有正常节点的情况下，while循环遍历方法也是可行的
 	htmlParser.parseHtml(NULL);
 	pNode = htmlParser.getHtmlNode(0);
-	while(pNode->type != NODE_UNKNOWN)
+	while(pNode->type != NODE_NULL)
 	{
 		htmlParser.dumpHtmlNode(pNode);
 		pNode++;

@@ -328,8 +328,8 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 	if(szHtml == NULL || *szHtml == '\0')
 	{
 		HtmlNode* pNode = appendHtmlNode();
-		pNode->type = NODE_UNKNOWN;
-		return; //额外添加一个NODE_UNKNOWN节点
+		pNode->type = NODE_NULL;
+		return; //额外添加一个NODE_NULL节点
 	}
 
 	char* p = (char*) szHtml;
@@ -532,9 +532,9 @@ onuserend:
 	return;
 
 endnodes:
-	//确保在所有节点最后额外添加一个NODE_UNKNOWN节点
+	//确保在所有节点最后额外添加一个NODE_NULL节点
 	pNode = appendHtmlNode();
-	pNode->type = NODE_UNKNOWN;
+	pNode->type = NODE_NULL;
 
 #ifdef _DEBUG
 	dumpHtmlNodes(); //just for test
@@ -543,7 +543,7 @@ endnodes:
 
 int HtmlParser::getHtmlNodeCount()
 {
-	//忽略最后一个额外添加的NODE_UNKNOWN节点，参见parseHtml()
+	//不包括最后一个额外添加的NODE_NULL节点，参见parseHtml()
 	return (int)(m_HtmlNodes.getDataSize() / sizeof(HtmlNode)) - 1;
 }
 

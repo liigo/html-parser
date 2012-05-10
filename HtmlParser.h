@@ -85,6 +85,7 @@ enum HtmlNodeType
 	NODE_END_TAG,   //结束标签，如 </a>
 	NODE_CONTENT,   //内容: 介于开始标签和/或结束标签之间的普通文本
 	NODE_REMARKS,   //注释: <!-- -->
+	NODE_NULL,      //作为所有节点的终结标记
 };
 
 enum HtmlTagType
@@ -157,14 +158,14 @@ private:
 	void operator=(const HtmlParser&);
 
 public:
-	//解析HTML，解析结果是一系列HtmlNode节点
-	//最后必然会额外添加一个NODE_UNKNOWN节点(HtmlNode.type==NODE_UNKNOWN)作为所有节点的终结标记
+	//解析HTML，解析结果是一系列HtmlNode节点（可通过getHtmlNode()获取）
+	//最后必然会额外添加一个NODE_NULL节点(HtmlNode.type==NODE_NULL)作为所有节点的终结标记
 	void parseHtml(const char* szHtml, bool parseAttributes = false);
 
-	//取节点个数（不包括额外添加的NODE_UNKNOWN节点）
+	//取节点个数（不包括最后一个额外添加的NODE_NULL节点）
 	int getHtmlNodeCount();
 	//取指定索引处的节点，索引必须合法: 0 <= index <= getHtmlNodeCount()
-	//其中最后一个节点（即index==getHtmlNodeCount()处）为额外添加的NODE_UNKNOWN节点
+	//其中最后一个节点（即index==getHtmlNodeCount()处）为额外添加的NODE_NULL节点
 	HtmlNode* getHtmlNode(int index);
 
 	static bool cloneHtmlNode(const HtmlNode* pSrcNode, HtmlNode* pDestNode); //需使用cleanHtmlNode()清理
