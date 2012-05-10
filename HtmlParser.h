@@ -28,8 +28,12 @@ public:
 	//向缓存区复制数据块，写入现有数据的末尾，必要时会自动扩充缓存区
 	//返回新写入的数据块首地址在缓存区中的偏移量
 	size_t appendData(const void* pData, size_t nSize);
+	//在指定索引offset处插入指定长度nSize的数据，pData为NULL时插入的数据均为0字节值，原有数据自动后移，必要时会自动扩充缓存区
+	void insertData(size_t offset, const void* pData, size_t nSize);
+	//在指定索引offset处删除指定长度size的数据，原有数据自动前移
+	void deleteData(size_t offset, size_t size);
 	//取数据首地址(在数据长度为0时返回NULL)
-	//在appendXXX()或resetSize()或shrink()或exchange()或operator=调用之后可能会导致数据首地址发生改变
+	//在appendXXX()或insertData()或resetSize()或shrink()或exchange()或operator=调用之后可能会导致数据首地址发生改变
 	inline void* getData() const { return (m_nDataSize == 0 ? NULL : m_pBuffer); }
 	//取指定偏移处数据地址，偏移offset应小于getDataSize()，否则不保证返回的地址有效
 	inline void* getOffsetData(int offset) const { return (m_nDataSize == 0 ? NULL : ((unsigned char*)m_pBuffer + offset)); }

@@ -1000,6 +1000,28 @@ size_t MemBuffer::appendData(const void* pData, size_t nSize)
 	return (m_nDataSize - nSize);
 }
 
+void MemBuffer::insertData(size_t offset, const void* pData, size_t nSize)
+{
+	assert(offset < m_nDataSize);
+	if(nSize == 0) return;
+	void* pEnd = require(nSize);
+	memmove(m_pBuffer + offset + nSize, m_pBuffer + offset, m_nDataSize - nSize - offset);
+	if(pData)
+		memcpy(m_pBuffer + offset, pData, nSize);
+	else
+		memset(m_pBuffer + offset, 0, nSize);
+	m_nDataSize += nSize;
+}
+
+void MemBuffer::deleteData(size_t offset, size_t size)
+{
+	assert(offset < m_nDataSize);
+	if(size == 0) return;
+	memmove(m_pBuffer + offset, m_pBuffer + offset + size, m_nDataSize - size - offset);
+	memset(m_pBuffer + offset + size, 0, size);
+	m_nDataSize -= size;
+}
+
 void MemBuffer::resetDataSize(size_t size)
 {
 	size_t oldDataSize = m_nDataSize;
