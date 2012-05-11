@@ -84,12 +84,13 @@ private:
 
 enum HtmlNodeType
 {
-	NODE_UNKNOWN = 0,
+	NODE_NULL = 0,  //作为所有节点的终结标记
 	NODE_START_TAG, //开始标签，如 <a href="liigo.com"> 或 <br/>
 	NODE_END_TAG,   //结束标签，如 </a>
 	NODE_CONTENT,   //内容: 介于开始标签和/或结束标签之间的普通文本
 	NODE_REMARKS,   //注释: <!-- -->
-	NODE_NULL,      //作为所有节点的终结标记
+	NODE_UNKNOWN,   //未知的节点类型
+	_NODE_USER_, //用户定义的其他节点类型值应大于_NODE_USER_
 };
 
 enum HtmlTagType
@@ -184,9 +185,9 @@ public:
 	static void parseAttributes(HtmlNode* pNode); //解析节点属性
 	//output
 	void outputHtml(MemBuffer& buffer, bool keepBufferData = false);
-	void outputHtmlNode(MemBuffer& buffer, const HtmlNode* pNode);
+	static void outputHtmlNode(MemBuffer& buffer, const HtmlNode* pNode);
 	void dumpHtmlNodes(FILE* f = stdout); //for debug or test
-	void dumpHtmlNode(const HtmlNode* pNode, int nodeIndex = -1, FILE* f = stdout);
+	static void dumpHtmlNode(const HtmlNode* pNode, int nodeIndex = -1, FILE* f = stdout);
 
 protected:
 	//允许子类覆盖, 以便识别更多标签(提高解析质量), 或者识别更少标签(提高解析速度)

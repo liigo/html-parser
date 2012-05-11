@@ -268,6 +268,7 @@ HtmlNode* HtmlParser::appendHtmlNode()
 	static char staticHtmlNodeTemplate[sizeof(HtmlNode)] = {0};
 	size_t offset = m_HtmlNodes.appendData(staticHtmlNodeTemplate, sizeof(HtmlNode));
 	HtmlNode* pNode = (HtmlNode*) m_HtmlNodes.getOffsetData(offset);
+	pNode->type = NODE_UNKNOWN;
 	return pNode;
 }
 
@@ -786,7 +787,7 @@ void HtmlParser::dumpHtmlNode(const HtmlNode* pNode, int nodeIndex, FILE* f)
 		break;
 	case NODE_UNKNOWN:
 	default:
-		sprintf(buffer, "%2d) type: NODE_UNKNOWN", nodeIndex);
+		sprintf(buffer, "%2d) type: UNKNOWN NODE (type = %d)", nodeIndex, pNode->type);
 		break;
 	}
 	fprintf(f, "%s", buffer);
