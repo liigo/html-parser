@@ -631,7 +631,7 @@ bool HtmlParser::cloneHtmlNode(const HtmlNode* pSrcNode, HtmlNode* pDestNode)
 //[virtual]
 void HtmlParser::onParseAttributes(HtmlNode* pNode)
 {
-	if(pNode->tagType != NODE_UNKNOWN)
+	if(pNode->tagType != TAG_UNKNOWN)
 		parseAttributes(pNode);
 }
 
