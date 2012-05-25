@@ -538,7 +538,7 @@ endnodes:
 	pNode->type = NODE_NULL;
 
 #ifdef _DEBUG
-	dumpHtmlNodes(); //just for test
+	//dumpHtmlNodes(); //just for test
 #endif
 }
 
