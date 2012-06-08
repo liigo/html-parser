@@ -41,8 +41,9 @@ void main()
 	parse_and_dump("<color=red>");
 	parse_and_dump("<p><!--remarks-->...</p>");
 	parse_and_dump("<p><!--**<p></p>**--><x/>...</p>");
-	parse_and_dump("<style>..<p.><<.every things here, all in style</style>");
-	parse_and_dump("<script>..<p.><<.every things here, all in script</script>");
+	parse_and_dump("<style>..<p.><<.every things here, all in style</style>"); //style内可为任意文本
+	parse_and_dump("<script>..<p.><<.every things here, all in script</script>"); //script内可为任意文本
+	parse_and_dump("<textarea>**<b><style><<...</textarea><p>"); //textarea内可为任意文本
 	parse_and_dump("<a href=\"http://www.163.com\">");  //确认解析后不是自封闭标签
 	parse_and_dump("<a href=\"http://www.163.com\"/>"); //确认解析后是自封闭标签
 	parse_and_dump("<a\tx=1> <a\nx=1\ny=2> <a\r\nx=1\r\ny=2>"); //非空格分隔符

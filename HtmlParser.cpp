@@ -240,8 +240,9 @@ static HtmlTagType identifyHtmlTag_Internal(const char* szTagName)
 {
 	static N2T n2tTable[] = 
 	{
-		{ "SCRIPT", TAG_SCRIPT },
-		{ "STYLE",  TAG_STYLE  },
+		{ "SCRIPT",   TAG_SCRIPT   },
+		{ "STYLE",    TAG_STYLE    },
+		{ "TEXTAREA", TAG_TEXTAREA },
 	};
 
 	return identifyHtmlTagInTable(szTagName, n2tTable, sizeof(n2tTable)/sizeof(n2tTable[0]));
@@ -344,11 +345,12 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 	char* s = (char*) szHtml;
 	HtmlNode* pNode = NULL;
 	char c;
-	bool bInQuote1  = false; //between ' and '
-	bool bInQuote2  = false; //between " and "
-	bool bInScript  = false; //between <scripte> and </script>
-	bool bInStyle   = false; //between <style> and </style>
-	bool bInsideTag = false; //between < and >
+	bool bInQuote1   = false; //between ' and '
+	bool bInQuote2   = false; //between " and "
+	bool bInScript   = false; //between <scripte> and </script>
+	bool bInStyle    = false; //between <style> and </style>
+	bool bInTextArea = false; //between <textarea> and </textarea>
+	bool bInsideTag  = false; //between < and >
 
 	while( c = *p )
 	{
@@ -397,6 +399,20 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 			else
 				goto onerror; //error: no </style>
 		}
+		else if(bInTextArea)
+		{
+			//跳过<textarea>和</textarea>之间的任何文本
+			const char* pEndTextArea = findFirstStr(p, "</textarea>", false);
+			if(pEndTextArea)
+			{
+				bInTextArea = false;
+				p = (char*)pEndTextArea;
+				c = *p;
+			}
+			else
+				goto onerror; //error: no </textarea>
+		}
+
 
 		if(c == '<') // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 		{
@@ -496,8 +512,11 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 				pNode->tagType = identifyHtmlTag_Internal(pNode->tagName); //内部识别SCRIPT,STYLE
 				if(pNode->tagType == TAG_STYLE)
 					bInStyle = (pNode->type == NODE_START_TAG);
-				if(pNode->tagType == TAG_SCRIPT)
+				else if(pNode->tagType == TAG_SCRIPT)
 					bInScript = (pNode->type == NODE_START_TAG);
+				else if(pNode->tagType == TAG_TEXTAREA)
+					bInTextArea = (pNode->type == NODE_START_TAG);
+
 				//识别节点类型(HtmlTagType) - 用户处理
 				if(pNode->tagType == TAG_UNKNOWN)
 					pNode->tagType = onIdentifyHtmlTag(pNode->tagName, pNode->type);
@@ -900,7 +919,7 @@ void HtmlParser::outputHtmlNode(MemBuffer& buffer, const HtmlNode* pNode)
 			buffer.appendText(pNode->text);
 		}
 		if(pNode->flags & FLAG_SELF_CLOSING_TAG)
-			buffer.appendChar('/'); //自封闭
+			buffer.appendText(" /"); //自封闭
 		buffer.appendChar('>');
 		break;
 	case NODE_END_TAG:

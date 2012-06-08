@@ -96,7 +96,7 @@ enum HtmlNodeType
 enum HtmlTagType
 {
 	TAG_UNKNOWN = 0, //表示未经识别的标签类型，参见HtmlParser.onIdentifyHtmlTag()
-	TAG_SCRIPT, TAG_STYLE, //出于解析需要必须识别<script>和<style>，内部特别处理
+	TAG_SCRIPT, TAG_STYLE, TAG_TEXTAREA, //出于解析需要必须识别<script>,<style>和<textarea>，内部特别处理
 	//以下按标签字母顺序排列, 来源：http://www.w3.org/TR/html4/index/elements.html (HTML4)
 	//and http://www.w3.org/TR/html5/section-index.html#elements-1 (HTML5)
 	//此处仅定义类型值，不代表解析器一定识别出它们，参见HtmlParser.onIdentifyHtmlTag()
@@ -110,7 +110,7 @@ enum HtmlTagType
 	TAG_LABEL, TAG_LEGEND, TAG_LI, TAG_LINK, TAG_MAP, TAG_MARK, TAG_MENU, TAG_META, TAG_METER, TAG_NAV, TAG_NOFRAMES, TAG_NOSCRIPT, 
 	TAG_OBJECT, TAG_OL, TAG_OPTGROUP, TAG_OPTION, TAG_P, TAG_PARAM, TAG_PRE, TAG_PROGRESS, TAG_Q, TAG_RP, TAG_RT, TAG_RUBY, 
 	TAG_S, TAG_SAMP, TAG_SECTION, TAG_SELECT, TAG_SMALL, TAG_SOURCE, TAG_SPAN, TAG_STRIKE, TAG_STRONG, TAG_SUB, TAG_SUMMARY, TAG_SUP, 
-	TAG_TABLE, TAG_TBODY, TAG_TD, TAG_TEXTAREA, TAG_TFOOT, TAG_TH, TAG_THEAD, TAG_TIME, TAG_TITLE, TAG_TR, TAG_TRACK, TAG_TT, 
+	TAG_TABLE, TAG_TBODY, TAG_TD, TAG_TFOOT, TAG_TH, TAG_THEAD, TAG_TIME, TAG_TITLE, TAG_TR, TAG_TRACK, TAG_TT, 
 	TAG_U, TAG_UL, TAG_VAR, TAG_VIDEO, TAG_WBR, 
 	_TAG_USER_TAG_, //用户定义的其他标签类型值应大于_TAG_USER_TAG_，以确保不与上面定义的常量值重复
 };
