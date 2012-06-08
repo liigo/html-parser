@@ -168,12 +168,19 @@ int copyStrUtill(char* pDest, size_t nDest, const char* pSrc, char endchar, bool
 }
 
 //nChar can be -1
-char* duplicateStr(const char* pSrc, size_t nChar)
+char* duplicateStr(const char* pSrc, size_t nChar, const char* pPrefix = NULL)
 {
 	if(nChar == (size_t)-1)
 		nChar = strlen(pSrc);
-	char* pNew = (char*) malloc( (nChar+1) * sizeof(char) );
-	copyStr(pNew, -1, pSrc, nChar);
+	int lenPrefix = pPrefix ? strlen(pPrefix) : 0;
+	char* pNew = (char*) malloc( (lenPrefix + nChar + 1) * sizeof(char) );
+	if(lenPrefix > 0)
+	{
+		copyStr(pNew, -1, pPrefix, lenPrefix);
+		copyStr(pNew + lenPrefix, -1, pSrc, nChar);
+	} else {
+		copyStr(pNew, -1, pSrc, nChar);
+	}
 	return pNew;
 }
 
@@ -203,13 +210,13 @@ inline const char* nextUnqotedSpaceChar(const char* p)
 	return findFirstUnquotedChars(p, " \n\r\t\f", 5, true);
 }
 
-char* duplicateStrAndUnquote(const char* str, size_t nChar)
+char* duplicateStrAndUnquote(const char* str, size_t nChar, const char* prefix = NULL)
 {
 	if( nChar > 1 && (str[0] == '\"' && str[nChar-1] == '\"') || (str[0] == '\'' && str[nChar-1] == '\'') )
 	{
 		str++; nChar-=2;
 	}
-	return duplicateStr(str, nChar);
+	return duplicateStr(str, nChar, prefix);
 }
 
 //-----------------------------------------------------------------------------
@@ -635,15 +642,11 @@ void HtmlParser::onParseAttributes(HtmlNode* pNode)
 		parseAttributes(pNode);
 }
 
-void HtmlParser::parseAttributes(HtmlNode* pNode)
+void HtmlParser::parseExtraAttributes(const char* szAttributesText, HtmlNode* pTargetNode, const char* szNamePrefix)
 {
-	if(pNode == NULL || pNode->attributeCount > 0 || pNode->text == NULL)
-		return;
-	if(pNode->tagName[0] == '!' && stricmp(pNode->tagName+1, "DOCTYPE") == 0)
-		return; //don't parse <!DOCTYPE ...>'s text: not name=value syntax
-
-	char* p = pNode->text;
-	char* ps = NULL;
+	assert(pTargetNode);
+	const char* p = szAttributesText;
+	const char* ps = NULL;
 	MemBuffer mem;
 
 	bool inQuote1 = false, inQuote2 = false;
@@ -696,10 +699,26 @@ void HtmlParser::parseAttributes(HtmlNode* pNode)
 
 	char** pp = (char**) mem.getData();
 
-	MemBuffer* attributes = new MemBuffer();
+	//下面把解析出来的属性值存入pTargetNode->attributes
+
+	MemBuffer* attributes = pTargetNode->attributes;
+	if(attributes == NULL)
+	{
+		attributes = new MemBuffer();
+		pTargetNode->attributes = attributes;
+	}
+
 	for(int i = 0, n = mem.getDataSize() / sizeof(char*) - 2; i < n; i++)
 	{
-		attributes->appendPointer(pp[i]); //attribute name
+		if(!szNamePrefix)
+		{
+			attributes->appendPointer(pp[i]); //attribute name
+		} else {
+			char* newAttributeName = duplicateStr(pp[i], -1, szNamePrefix);
+			attributes->appendPointer(newAttributeName); //attribute name
+			freeDuplicatedStr(pp[i]);
+		}
+
 		if(pp[i+1] == NULL)
 		{
 			attributes->appendPointer(pp[i+2]); //attribute value
@@ -714,8 +733,16 @@ void HtmlParser::parseAttributes(HtmlNode* pNode)
 	}
 
 	attributes->shrink();
-	pNode->attributeCount = attributes->getDataSize() / sizeof(HtmlAttribute);
-	pNode->attributes = attributes;
+	pTargetNode->attributeCount = attributes->getDataSize() / sizeof(HtmlAttribute);
+}
+
+void HtmlParser::parseAttributes(HtmlNode* pNode)
+{
+	if(pNode == NULL || pNode->attributeCount > 0 || pNode->text == NULL)
+		return;
+	if(pNode->tagName[0] == '!' && stricmp(pNode->tagName+1, "DOCTYPE") == 0)
+		return; //don't parse <!DOCTYPE ...>'s text: not name=value syntax
+	HtmlParser::parseExtraAttributes(pNode->text, pNode, NULL);
 }
 
 const HtmlAttribute* HtmlParser::getAttribute(const HtmlNode* pNode, size_t index)

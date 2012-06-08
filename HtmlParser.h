@@ -166,7 +166,9 @@ private:
 public:
 	//解析HTML，解析结果是一系列连续存储的HtmlNode节点（可通过getHtmlNode(index)获取）
 	//最后必然会额外添加一个NODE_NULL节点(HtmlNode.type==NODE_NULL)作为所有节点的终结标记
-	void parseHtml(const char* szHtml, bool parseAttributes = false);
+	//参数parseAttributes为true时，虚函数onParseAttributes()必要时将被调用，用户有机会决定是否解析属性
+	//参数parseAttributes为false表示不解析任何属性，甚至连onParseAttributes()也不会调用
+	void parseHtml(const char* szHtml, bool parseAttributes = true);
 
 	//取节点个数（不包括最后一个额外添加的NODE_NULL节点）
 	int getHtmlNodeCount();
@@ -183,7 +185,8 @@ public:
 	static const HtmlAttribute* getAttribute(const HtmlNode* pNode, const char* szAttributeName); //return NULL if attribute not exist
 	static const char* getAttributeStringValue(const HtmlNode* pNode, const char* szAttributeName, const char* szDefaultValue = NULL);
 	static int getAttributeIntValue(const HtmlNode* pNode, const char* szAttributeName, int defaultValue = 0);
-	static void parseAttributes(HtmlNode* pNode); //解析节点属性, 通常在onParseAttributes()内使用
+	static void parseAttributes(HtmlNode* pNode); //解析pNode->text里面的属性, 通常在onParseAttributes()内使用
+	static void parseExtraAttributes(const char* szAttributesText, HtmlNode* pTargetNode, const char* szNamePrefix = NULL); //解析文本szAttributesText里的属性并存入pTargetNode（保留原有属性）, 参数szNamePrefix用于指定额外添加的属性名称前缀（以防新解析的属性与原有属性名称冲突）
 	//output
 	void outputHtml(MemBuffer& buffer, bool keepBufferData = false);
 	static void outputHtmlNode(MemBuffer& buffer, const HtmlNode* pNode);

@@ -12,16 +12,18 @@ class ParseAll : public HtmlParser
 
 static void testfile(const char* fileName);
 static void testoutput(const char* szHtml);
+static void parse_and_dump(const char* szHtml);
 static void enumnodes();
+static void test_custom_attributes();
 
 void main()
 {
 	HtmlParser htmlParser;
 	MemBuffer  mem;
 
-	htmlParser.parseHtml("<a url=xx>父母<陪孩子长大>: </a>"); //视为不合法?
-	htmlParser.parseHtml("<a value=野蛮肘击>", true); //'蛮'字GB18030编码影响解析?
-	htmlParser.parseHtml("<a alt=3岁120斤你信吗 src=罕见动物交配场景>", true); //'斤见物'等字GB18030编码影响解析?	
+	parse_and_dump("<a url=xx>父母<陪孩子长大>: </a>"); //视为不合法?
+	parse_and_dump("<a value=野蛮肘击>"); //'蛮'字GB18030编码影响解析?
+	parse_and_dump("<a alt=3岁120斤你信吗 src=罕见动物交配场景>"); //'斤见物'等字GB18030编码影响解析?	
 
 	testoutput("abc<![CDATA[<<a/>>]]>xyz"); //正确解析CDATA
 	testoutput("<!doctype html>"); //不要解析<!DOCTYPE ...>的属性，原样输出
@@ -30,23 +32,25 @@ void main()
 	testoutput("<a defer url=liigo.com x='' selected>"); //属性没有值
 	testoutput("<a url=\"abc\'def\'\" x=\'hello \"liigo\"\'>"); //属性值双引号和单引号嵌套
 
-	htmlParser.parseHtml("<script rel=\"next\" href=\"objects.html\">", true);
-	htmlParser.parseHtml("...<p>---<a href=url>link</a>...");
-	htmlParser.parseHtml("<p>---< a   href=url >link</a>");
-	htmlParser.parseHtml("<a x=a y=b z = \"c <a href=url>\" >", true); //属性值引号内有<或>不要影响解析
-	htmlParser.parseHtml("<p>\"引号”不匹配</p>");
-	htmlParser.parseHtml("<a x=0> <b y=1> <img z=ok w=false> - </img>", true);
-	htmlParser.parseHtml("<color=red>");
-	htmlParser.parseHtml("<p><!--remarks-->...</p>");
-	htmlParser.parseHtml("<p><!--**<p></p>**--><x/>...</p>");
-	htmlParser.parseHtml("<style>..<p.><<.every things here, all in style</style>");
-	htmlParser.parseHtml("<script>..<p.><<.every things here, all in script</script>");
-	htmlParser.parseHtml("<a href=\"http://www.163.com\">");  //确认解析后不是自封闭标签
-	htmlParser.parseHtml("<a href=\"http://www.163.com\"/>"); //确认解析后是自封闭标签
-	htmlParser.parseHtml("<a\tx=1> <a\nx=1\ny=2> <a\r\nx=1\r\ny=2>", true); //非空格分隔符
-	htmlParser.parseHtml("<a x=\"abc\"y=''z>", true); //属性值引号后面没有空白分隔符，并不鲜见
+	parse_and_dump("<script rel=\"next\" href=\"objects.html\">");
+	parse_and_dump("...<p>---<a href=url>link</a>...");
+	parse_and_dump("<p>---< a   href=url >link</a>");
+	parse_and_dump("<a x=a y=b z = \"c <a href=url>\" >"); //属性值引号内有<或>不要影响解析
+	parse_and_dump("<p>\"引号”不匹配</p>");
+	parse_and_dump("<a x=0> <b y=1> <img z=ok w=false> - </img>");
+	parse_and_dump("<color=red>");
+	parse_and_dump("<p><!--remarks-->...</p>");
+	parse_and_dump("<p><!--**<p></p>**--><x/>...</p>");
+	parse_and_dump("<style>..<p.><<.every things here, all in style</style>");
+	parse_and_dump("<script>..<p.><<.every things here, all in script</script>");
+	parse_and_dump("<a href=\"http://www.163.com\">");  //确认解析后不是自封闭标签
+	parse_and_dump("<a href=\"http://www.163.com\"/>"); //确认解析后是自封闭标签
+	parse_and_dump("<a\tx=1> <a\nx=1\ny=2> <a\r\nx=1\r\ny=2>"); //非空格分隔符
+	parse_and_dump("<a x=\"abc\"y=''z>"); //属性值引号后面没有空白分隔符，并不鲜见
 
 	enumnodes(); //展示遍历节点的方法
+
+	test_custom_attributes();
 
 	//测试解析各大门户网站
 	testfile("testfiles\\sina.com.cn.html");
@@ -103,6 +107,13 @@ static void testoutput(const char* szHtml)
 	printf("%s\n", (char*)mem.getData());
 }
 
+static void parse_and_dump(const char* szHtml)
+{
+	ParseAll parser;
+	parser.parseHtml(szHtml, true);
+	parser.dumpHtmlNodes();
+}
+
 static void enumnodes()
 {
 	HtmlParser htmlParser;
@@ -133,4 +144,13 @@ static void enumnodes()
 		pNode++;
 	}
 
+}
+
+static void test_custom_attributes()
+{
+	HtmlParser htmlParser;
+	htmlParser.parseHtml("<a custom='a=1 b=2 c d e=3 f' a=0>", true);
+	HtmlNode* pNode = htmlParser.getHtmlNode(0);
+	HtmlParser::parseExtraAttributes(HtmlParser::getAttributeStringValue(pNode, "custom"), pNode, "custom:");
+	htmlParser.dumpHtmlNode(pNode);
 }
