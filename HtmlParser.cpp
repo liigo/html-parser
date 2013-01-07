@@ -4,8 +4,13 @@
 #include <ctype.h>
 #include <assert.h>
 
-//HtmlParser类，用于解析HTML文本
+//HtmlParser锟洁，锟斤拷锟节斤拷锟斤拷HTML锟侥憋拷
 //by liigo, @2010-2012
+
+#ifndef WIN32
+	#include <strings.h>
+	#define stricmp strcasecmp
+#endif
 
 using namespace liigo;
 
@@ -235,7 +240,7 @@ static HtmlTagType identifyHtmlTagInTable(const char* szTagName, N2T* table, int
 	return TAG_UNKNOWN;
 }
 
-//出于解析需要必须识别的HtmlTagType
+//锟斤拷锟节斤拷锟斤拷锟斤拷要锟斤拷锟斤拷识锟斤拷锟斤拷HtmlTagType
 static HtmlTagType identifyHtmlTag_Internal(const char* szTagName)
 {
 	static N2T n2tTable[] = 
@@ -251,8 +256,8 @@ static HtmlTagType identifyHtmlTag_Internal(const char* szTagName)
 //[virtual]
 HtmlTagType HtmlParser::onIdentifyHtmlTag(const char* szTagName, HtmlNodeType nodeType)
 {
-	//默认仅识别涉及HTML基本结构和信息的有限几个TAG
-	//交给用户自行扩展以便识别更多或更少
+	//默锟较斤拷识锟斤拷锟芥及HTML锟斤拷锟斤拷锟结构锟斤拷锟斤拷息锟斤拷锟斤拷锟睫硷拷锟斤拷TAG
+	//锟斤拷锟斤拷锟矫伙拷锟斤拷锟斤拷锟斤拷展锟皆憋拷识锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
 
 	if(nodeType != NODE_START_TAG)
 		return TAG_UNKNOWN;
@@ -287,7 +292,7 @@ static void setNodeAttributeText(HtmlNode* pNode, const char* pStart)
 	if(pStart[0] == '>') return; //no attribute text
 	if(pStart[0] == '/' && pStart[1] == '>')
 	{
-		pNode->flags |= FLAG_SELF_CLOSING_TAG; //自封闭标签
+		pNode->flags |= FLAG_SELF_CLOSING_TAG; //锟皆凤拷锟秸憋拷签
 		return; //no attribute text
 	}
 
@@ -295,13 +300,13 @@ static void setNodeAttributeText(HtmlNode* pNode, const char* pStart)
 	if(attributeText)
 	{
 		int len = strlen(attributeText);
-		if(attributeText[len-1] == '/') //去掉最后可能会有的'/'字符, 如这种情况: <img src="..." />
+		if(attributeText[len-1] == '/') //去锟斤拷锟斤拷锟斤拷锟斤拷锟杰伙拷锟叫碉拷'/'锟街凤拷, 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷: <img src="..." />
 		{
 			attributeText[len-1] = '\0';
-			pNode->flags |= FLAG_SELF_CLOSING_TAG; //自封闭标签
+			pNode->flags |= FLAG_SELF_CLOSING_TAG; //锟皆凤拷锟秸憋拷签
 		}
 		pNode->text = attributeText;
-		pNode->flags |= FLAG_NEED_FREE_TEXT; //标记需释放文本
+		pNode->flags |= FLAG_NEED_FREE_TEXT; //锟斤拷锟斤拷锟斤拷锟酵凤拷锟侥憋拷
 	}
 }
 
@@ -312,9 +317,9 @@ static const char* s_CRLF = "\r\n"; //Windows
 // pNode != NULL, pStart != NULL, len > 0
 static void setNodeText(HtmlNode* pNode, const char* pStart, int len)
 {
-	//由于空行文本比较常见，每个行首标签的前面都可能有一个空行文本
-	//此处优化直接返回常量文本，以减少不必要的内存分配
-	//因为没有设定FLAG_NEED_FREE_TEXT标记，freeHtmlNode(pNode)里不会释放这类常量文本
+	//锟斤拷锟节匡拷锟斤拷锟侥憋拷锟饺较筹拷锟斤拷锟斤拷每锟斤拷锟斤拷锟阶憋拷签锟斤拷前锟芥都锟斤拷锟斤拷锟斤拷一锟斤拷锟斤拷锟斤拷锟侥憋拷
+	//锟剿达拷锟脚伙拷直锟接凤拷锟截筹拷锟斤拷锟侥憋拷锟斤拷锟皆硷拷锟劫诧拷锟斤拷要锟斤拷锟节达拷锟斤拷锟斤拷
+	//锟斤拷为没锟斤拷锟借定FLAG_NEED_FREE_TEXT锟斤拷锟角ｏ拷freeHtmlNode(pNode)锟斤不锟斤拷锟酵凤拷锟斤拷锟洁常锟斤拷锟侥憋拷
 	if(len == 1 && pStart[0] == '\n') { pNode->text = (char*)s_LF; return; }
 
 	if(pStart[0] == '\r')
@@ -323,11 +328,11 @@ static void setNodeText(HtmlNode* pNode, const char* pStart, int len)
 		if(len == 2 && pStart[1] == '\n') { pNode->text = (char*)s_CRLF; return; }
 	}
 
-	char* text = duplicateStr(pStart, len); //TODO: 将来优化到尽量少复制文本
+	char* text = duplicateStr(pStart, len); //TODO: 锟斤拷锟斤拷锟脚伙拷锟斤拷锟斤拷锟斤拷锟劫革拷锟斤拷锟侥憋拷
 	if(text)
 	{
 		pNode->text = text;
-		pNode->flags |= FLAG_NEED_FREE_TEXT; //标记需释放文本
+		pNode->flags |= FLAG_NEED_FREE_TEXT; //锟斤拷锟斤拷锟斤拷锟酵凤拷锟侥憋拷
 	}
 }
 
@@ -338,7 +343,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 	{
 		HtmlNode* pNode = appendHtmlNode();
 		pNode->type = NODE_NULL;
-		return; //额外添加一个NODE_NULL节点
+		return; //锟斤拷锟斤拷锟斤拷锟斤拷一锟斤拷NODE_NULL锟节碉拷
 	}
 
 	char* p = (char*) szHtml;
@@ -356,7 +361,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 	{
 		if(bInsideTag)
 		{
-			//在 < 和 > 之间，跳过单引号或双引号内的任何文本（包括<和>）
+			//锟斤拷 < 锟斤拷 > 之锟戒，锟斤拷锟斤拷锟斤拷锟斤拷锟脚伙拷双锟斤拷锟斤拷锟节碉拷锟轿猴拷锟侥憋拷锟斤拷锟斤拷锟斤拷<锟斤拷>锟斤拷
 			if(c == '\'')
 			{
 				bInQuote1 = !bInQuote1;
@@ -375,7 +380,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 
 		if(bInScript)
 		{
-			//跳过<script>和</script>之间的任何文本
+			//锟斤拷锟斤拷<script>锟斤拷</script>之锟斤拷锟斤拷锟轿猴拷锟侥憋拷
 			const char* pEndScript = findFirstStr(p, "</script>", false);
 			if(pEndScript)
 			{
@@ -388,7 +393,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 		}
 		else if(bInStyle)
 		{
-			//跳过<style>和</style>之间的任何文本
+			//锟斤拷锟斤拷<style>锟斤拷</style>之锟斤拷锟斤拷锟轿猴拷锟侥憋拷
 			const char* pEndStyle = findFirstStr(p, "</style>", false);
 			if(pEndStyle)
 			{
@@ -401,7 +406,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 		}
 		else if(bInTextArea)
 		{
-			//跳过<textarea>和</textarea>之间的任何文本
+			//锟斤拷锟斤拷<textarea>锟斤拷</textarea>之锟斤拷锟斤拷锟轿猴拷锟侥憋拷
 			const char* pEndTextArea = findFirstStr(p, "</textarea>", false);
 			if(pEndTextArea)
 			{
@@ -425,12 +430,12 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 				if(onNodeReady(pNode) == false) goto onuserend;
 			}
 
-			//处理HTML注释或CDATA
+			//锟斤拷锟斤拷HTML注锟酵伙拷CDATA
 			if(p[1] == '!')
 			{
 				if(p[2] == '-' && p[3] == '-')
 				{
-					//注释: <!-- ... -->
+					//注锟斤拷: <!-- ... -->
 					const char* pEndRemarks = findFirstStr(p + 4, "-->", true);
 					if(pEndRemarks)
 					{
@@ -455,7 +460,7 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 						pNode = appendHtmlNode();
 						pNode->type = NODE_CONTENT;
 						setNodeText(pNode, p + 9, pEndCData - (p + 9));
-						pNode->flags |= FLAG_CDATA_BLOCK; //标记CDATA, used by outputHtml() and dumpHtml()
+						pNode->flags |= FLAG_CDATA_BLOCK; //锟斤拷锟斤拷CDATA, used by outputHtml() and dumpHtml()
 						if(onNodeReady(pNode) == false) goto onuserend;
 						s = p = (char*)pEndCData + 3;
 						bInsideTag = bInQuote1 = bInQuote2 = false;
@@ -473,32 +478,32 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 		{
 			if(p > s)
 			{
-				//创建新节点(HtmlNode)，得到节点类型(NodeType)和名称(TagName)
+				//锟斤拷锟斤拷锟铰节碉拷(HtmlNode)锟斤拷锟矫碉拷锟节碉拷锟斤拷锟斤拷(NodeType)锟斤拷锟斤拷锟斤拷(TagName)
 				pNode = appendHtmlNode();
 				while(isspace(*s)) s++;
 				pNode->type = (*s == '/' ? NODE_END_TAG : NODE_START_TAG);
 				if(*s == '/') s++;
-				//这里得到的tagName可能包含一部分属性文本，需在下面修正
-				//tagName也可能是这种情况 a href="///////////////// （即缓冲区被填满,最后一个/是属性值中的字符）
+				//锟斤拷锟斤拷锟矫碉拷锟斤拷tagName锟斤拷锟杰帮拷锟斤拷一锟斤拷锟斤拷锟斤拷锟斤拷锟侥憋拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
+				//tagName也锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷 a href="///////////////// 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷,锟斤拷锟斤拷一锟斤拷/锟斤拷锟斤拷锟斤拷值锟叫碉拷锟街凤拷锟斤拷
 				copyStrUtill(pNode->tagName, MAX_HTML_TAG_LENGTH, s, '>', true);
 				int tagNameLen = strlen(pNode->tagName);
 				if(tagNameLen < MAX_HTML_TAG_LENGTH && pNode->tagName[tagNameLen-1] == '/')
 				{
-					//处理自封闭的标签, 如<br/>, 删除tagName中可能会有的'/'字符
-					//自封闭的结点的type设置为NODE_START_TAG应该可以接受(否则要引入新的节点类型NODE_STARTCLOSE_TAG)
+					//锟斤拷锟斤拷锟皆凤拷锟秸的憋拷签, 锟斤拷<br/>, 删锟斤拷tagName锟叫匡拷锟杰伙拷锟叫碉拷'/'锟街凤拷
+					//锟皆凤拷锟秸的斤拷锟斤拷锟斤拷type锟斤拷锟斤拷为NODE_START_TAG应锟矫匡拷锟皆斤拷锟斤拷(锟斤拷锟斤拷要锟斤拷锟斤拷锟铰的节碉拷锟斤拷锟斤拷NODE_STARTCLOSE_TAG)
 					pNode->flags |= FLAG_SELF_CLOSING_TAG; //used by outputHtml() and dumpHtml()
 					pNode->tagName[tagNameLen-1] = '\0';
 					tagNameLen--;
 				}
-				//修正节点名称，提取属性文本(存入pNode->text)
+				//锟斤拷锟斤拷锟节碉拷锟斤拷锟狡ｏ拷锟斤拷取锟斤拷锟斤拷锟侥憋拷(锟斤拷锟斤拷pNode->text)
 				int i;
 				for(i = 0; i < tagNameLen; i++)
 				{
-					if(isspace(pNode->tagName[i])    //第一个空白字符后面跟的是属性文本
-						|| pNode->tagName[i] == '=') //扩展支持这种格式: <tagName=value>, 等效于<tagName tagName=value>
+					if(isspace(pNode->tagName[i])    //锟斤拷一锟斤拷锟秸帮拷锟街凤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟侥憋拷
+						|| pNode->tagName[i] == '=') //锟斤拷展支锟斤拷锟斤拷锟街革拷式: <tagName=value>, 锟斤拷效锟斤拷<tagName tagName=value>
 					{
 						char* attributes = (pNode->tagName[i] == '=' ? s : s + i + 1);
-						setNodeAttributeText(pNode, attributes); //此处也处理了自封闭标签
+						setNodeAttributeText(pNode, attributes); //锟剿达拷也锟斤拷锟斤拷锟斤拷锟皆凤拷锟秸憋拷签
 						pNode->tagName[i] = '\0';
 						break;
 					}
@@ -508,8 +513,8 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 					//parse error, tag name is too long, MAX_HTML_TAG_LENGTH is too small
 				}
 
-				//识别节点类型(HtmlTagType) - 内部处理
-				pNode->tagType = identifyHtmlTag_Internal(pNode->tagName); //内部识别SCRIPT,STYLE
+				//识锟斤拷锟节碉拷锟斤拷锟斤拷(HtmlTagType) - 锟节诧拷锟斤拷锟斤拷
+				pNode->tagType = identifyHtmlTag_Internal(pNode->tagName); //锟节诧拷识锟斤拷SCRIPT,STYLE
 				if(pNode->tagType == TAG_STYLE)
 					bInStyle = (pNode->type == NODE_START_TAG);
 				else if(pNode->tagType == TAG_SCRIPT)
@@ -517,11 +522,11 @@ void HtmlParser::parseHtml(const char* szHtml, bool parseAttributes)
 				else if(pNode->tagType == TAG_TEXTAREA)
 					bInTextArea = (pNode->type == NODE_START_TAG);
 
-				//识别节点类型(HtmlTagType) - 用户处理
+				//识锟斤拷锟节碉拷锟斤拷锟斤拷(HtmlTagType) - 锟矫伙拷锟斤拷锟斤拷
 				if(pNode->tagType == TAG_UNKNOWN)
 					pNode->tagType = onIdentifyHtmlTag(pNode->tagName, pNode->type);
 
-				//解析节点属性
+				//锟斤拷锟斤拷锟节碉拷锟斤拷锟斤拷
 				if(pNode->type == NODE_START_TAG && parseAttributes && pNode->text)
 					onParseAttributes(pNode);
 
@@ -559,7 +564,7 @@ onuserend:
 	return;
 
 endnodes:
-	//确保在所有节点最后额外添加一个NODE_NULL节点
+	//确锟斤拷锟斤拷锟斤拷锟叫节碉拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷一锟斤拷NODE_NULL锟节碉拷
 	pNode = appendHtmlNode();
 	pNode->type = NODE_NULL;
 
@@ -570,7 +575,7 @@ endnodes:
 
 int HtmlParser::getHtmlNodeCount()
 {
-	//不包括最后一个额外添加的NODE_NULL节点，参见parseHtml()
+	//锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷一锟斤拷锟斤拷锟斤拷锟斤拷锟接碉拷NODE_NULL锟节点，锟轿硷拷parseHtml()
 	return (int)(m_HtmlNodes.getDataSize() / sizeof(HtmlNode)) - 1;
 }
 
@@ -624,7 +629,7 @@ bool HtmlParser::cloneHtmlNode(const HtmlNode* pSrcNode, HtmlNode* pDestNode)
 	if(pDestNode == NULL)
 		return false;
 
-	memcpy(pDestNode, pSrcNode, sizeof(HtmlNode)); //先浅拷贝，后面是深拷贝
+	memcpy(pDestNode, pSrcNode, sizeof(HtmlNode)); //锟斤拷浅锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟筋拷锟斤拷
 
 	if(pSrcNode->text)
 	{
@@ -681,7 +686,7 @@ void HtmlParser::parseExtraAttributes(const char* szAttributesText, HtmlNode* pT
 
 		if(notInQuote && (c == '\"' || c == '\'') && !isspace(p[1]))
 		{
-			//处理属性值引号后面没有空白分隔符的情况：a="v1"b=v2 （这种错误写法不少见，应兼容之）
+			//锟斤拷锟斤拷锟斤拷锟斤拷值锟斤拷锟脚猴拷锟斤拷没锟叫空白分革拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷a="v1"b=v2 锟斤拷锟斤拷锟街达拷锟斤拷写锟斤拷锟斤拷锟劫硷拷锟斤拷应锟斤拷锟斤拷之锟斤拷
 			if(ps)
 			{
 				mem.appendPointer(duplicateStrAndUnquote(ps, p - ps + 1));
@@ -718,7 +723,7 @@ void HtmlParser::parseExtraAttributes(const char* szAttributesText, HtmlNode* pT
 
 	char** pp = (char**) mem.getData();
 
-	//下面把解析出来的属性值存入pTargetNode->attributes
+	//锟斤拷锟斤拷锟窖斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷值锟斤拷锟斤拷pTargetNode->attributes
 
 	MemBuffer* attributes = pTargetNode->attributes;
 	if(attributes == NULL)
@@ -746,8 +751,8 @@ void HtmlParser::parseExtraAttributes(const char* szAttributesText, HtmlNode* pT
 		else
 			attributes->appendPointer(NULL); //attribute vlalue
 
-		//标记需free属性名称和属性值文本
-		//TODO: 将来优化到尽量少复制文本
+		//锟斤拷锟斤拷锟斤拷free锟斤拷锟斤拷锟斤拷锟狡猴拷锟斤拷锟斤拷值锟侥憋拷
+		//TODO: 锟斤拷锟斤拷锟脚伙拷锟斤拷锟斤拷锟斤拷锟劫革拷锟斤拷锟侥憋拷
 		attributes->appendInt(FLAG_NEED_FREE_NAME | FLAG_NEED_FREE_VALUE); //attribute flags
 	}
 
@@ -840,7 +845,7 @@ void HtmlParser::dumpHtmlNode(const HtmlNode* pNode, int nodeIndex, FILE* f)
 	if(pNode->text)
 		fprintf(f, ", text: %s", pNode->text);
 	if(pNode->flags & FLAG_SELF_CLOSING_TAG)
-		fprintf(f, ", flags: />"); //自封闭
+		fprintf(f, ", flags: />"); //锟皆凤拷锟斤拷
 	if(pNode->flags & FLAG_CDATA_BLOCK)
 		fprintf(f, ", flags: CDATA"); //CDATA
 	fprintf(f, "\r\n");
@@ -913,13 +918,13 @@ void HtmlParser::outputHtmlNode(MemBuffer& buffer, const HtmlNode* pNode)
 			if(attributeIndex < pNode->attributeCount - 1)
 				buffer.appendChar(' ');
 		}
-		if(pNode->attributeCount == 0 && pNode->text) //比如 <!DOCTYPE ...>
+		if(pNode->attributeCount == 0 && pNode->text) //锟斤拷锟斤拷 <!DOCTYPE ...>
 		{
 			buffer.appendChar(' ');
 			buffer.appendText(pNode->text);
 		}
 		if(pNode->flags & FLAG_SELF_CLOSING_TAG)
-			buffer.appendText(" /"); //自封闭
+			buffer.appendText(" /"); //锟皆凤拷锟斤拷
 		buffer.appendChar('>');
 		break;
 	case NODE_END_TAG:
@@ -981,7 +986,7 @@ void* MemBuffer::detach(bool bShrink)
 {
 	if(bShrink) shrink();
 	void* pReturn = m_pBuffer;
-	//数据长度为0时返回NULL,内部释放m_pBuffer
+	//锟斤拷锟捷筹拷锟斤拷为0时锟斤拷锟斤拷NULL,锟节诧拷锟酵凤拷m_pBuffer
 	if(m_pBuffer && m_nDataSize == 0)
 	{
 		free(m_pBuffer);
@@ -995,24 +1000,24 @@ void* MemBuffer::detach(bool bShrink)
 void* MemBuffer::require(size_t size)
 {
 	if(size == 0 || (m_nBufferSize - m_nDataSize) >= size)
-		return (m_pBuffer + m_nDataSize); //现有缓存区足够使用，不需要扩充缓存区
+		return (m_pBuffer + m_nDataSize); //锟斤拷锟叫伙拷锟斤拷锟斤拷锟姐够使锟矫ｏ拷锟斤拷锟斤拷要锟斤拷锟戒缓锟斤拷锟斤拷
 
-	//计算新的缓存区大小
+	//锟斤拷锟斤拷锟铰的伙拷锟斤拷锟斤拷锟斤拷小
 	size_t newBufferSize;
 	if(m_nBufferSize == 0)
 	{
-		newBufferSize = size; //缓存区初始大小
+		newBufferSize = size; //锟斤拷锟斤拷锟斤拷锟斤拷始锟斤拷小
 	}
 	else
 	{
-		//扩充缓存区
+		//锟斤拷锟戒缓锟斤拷锟斤拷
 		newBufferSize = (m_nBufferSize == 0 ? MEM_DEFAULT_BUFFER_SIZE : m_nBufferSize);
 		do {
-			newBufferSize <<= 1; //每次扩充一倍
+			newBufferSize <<= 1; //每锟斤拷锟斤拷锟斤拷一锟斤拷
 		}while(newBufferSize - m_nDataSize < size);
 	}
 
-	//分配缓存区内存
+	//锟斤拷锟戒缓锟斤拷锟斤拷锟节达拷
 	if(m_pBuffer == NULL)
 	{
 		m_pBuffer = (unsigned char*) malloc(newBufferSize);
@@ -1024,9 +1029,9 @@ void* MemBuffer::require(size_t size)
 		memset(m_pBuffer + m_nBufferSize, 0, newBufferSize - m_nBufferSize);
 	}
 
-	m_nBufferSize = newBufferSize; //设置新的缓存区大小
+	m_nBufferSize = newBufferSize; //锟斤拷锟斤拷锟铰的伙拷锟斤拷锟斤拷锟斤拷小
 
-	return (m_pBuffer + m_nDataSize); //返回
+	return (m_pBuffer + m_nDataSize); //锟斤拷锟斤拷
 }
 
 void MemBuffer::shrink()
@@ -1086,7 +1091,7 @@ void MemBuffer::resetDataSize(size_t size)
 
 	if(m_nDataSize < oldDataSize)
 	{
-		//如果数据长度被压缩，把被裁掉的部分数据清零
+		//锟斤拷锟斤拷锟斤拷锟捷筹拷锟饺憋拷压锟斤拷锟斤拷锟窖憋拷锟矫碉拷锟侥诧拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
 		memset(m_pBuffer + m_nDataSize, 0, oldDataSize - m_nDataSize);
 	}
 }
@@ -1154,7 +1159,7 @@ bool MemBuffer::loadFromFile(const char* szFileName, bool keepExistData, bool ap
 		if(pReadBytes) *pReadBytes = n;
 
 		fclose(pfile);
-		return (n == (size_t)filelen); // n != filelen 的情况下，返回false，同时返回了不完整的数据。不确认这种处理方法好不好。
+		return (n == (size_t)filelen); // n != filelen 锟斤拷锟斤拷锟斤拷锟铰ｏ拷锟斤拷锟斤拷false锟斤拷同时锟斤拷锟斤拷锟剿诧拷锟斤拷锟斤拷锟斤拷锟斤拷锟捷★拷锟斤拷确锟斤拷锟斤拷锟街达拷锟斤拷锟斤拷锟斤拷锟矫诧拷锟矫★拷
 	}
 	
 	return false;
