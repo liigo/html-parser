@@ -753,7 +753,7 @@ void HtmlParser::parseExtraAttributes(const char* szAttributesText, HtmlNode* pT
 
 		//标记需free属性名称和属性值文本
 		//TODO: 将来优化到尽量少复制文本
-		attributes->appendInt(FLAG_NEED_FREE_NAME | FLAG_NEED_FREE_VALUE); //attribute flags
+		attributes->appendInt((size_t)(FLAG_NEED_FREE_NAME | FLAG_NEED_FREE_VALUE)); //attribute flags
 	}
 
 	attributes->shrink();

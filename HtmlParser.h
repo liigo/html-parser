@@ -56,6 +56,7 @@ public:
 
 	//添加基本类型数据
 	inline size_t appendInt(int i) { return appendData(&i, sizeof(i)); }
+	inline size_t appendInt(size_t i) { return appendData(&i, sizeof(i)); }
 	inline size_t appendChar(char c) { return appendData(&c, sizeof(c)); }
 	//把指针p本身的值（而非p指向的数据）添加到缓存区
 	inline size_t appendPointer(const void* p) { return appendData(&p, sizeof(p)); }
